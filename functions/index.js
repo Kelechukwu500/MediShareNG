@@ -5,7 +5,9 @@ const nodemailer = require("nodemailer");
 
 admin.initializeApp();
 
-/* GMAIL TRANSPORT */
+/* =========================================
+   GMAIL TRANSPORT (MOVE TO ENV IN PROD)
+========================================= */
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -23,31 +25,19 @@ exports.sendWelcomeEmail = onDocumentCreated(
     try {
       const data = event.data.data();
 
-      const mailOptions = {
+      await transporter.sendMail({
         from: "MediShareNG <YOUR_GMAIL@gmail.com>",
         to: data.email,
         subject: "Welcome to MediShareNG Newsletter 🎉",
         html: `
           <div style="font-family: Arial; padding: 20px;">
             <h2>Thank you for subscribing!</h2>
-
-            <p>
-              You have successfully subscribed to the MediShareNG newsletter.
-            </p>
-
-            <p>
-              You will now receive healthcare updates, tips,
-              events and important announcements from us.
-            </p>
-
-            <br />
-
+            <p>You have successfully subscribed to MediShareNG newsletter.</p>
+            <p>You will now receive healthcare updates and announcements.</p>
             <p><strong>— MediShareNG Team</strong></p>
           </div>
         `,
-      };
-
-      await transporter.sendMail(mailOptions);
+      });
 
       console.log("Welcome email sent");
     } catch (error) {
@@ -124,7 +114,7 @@ exports.notifyAppointmentBooked = onDocumentCreated(
         .collection("notifications")
         .add({
           title: "New Appointment",
-          message: `${data.patientName || data.name} booked an appointment.`,
+          message: `${data.patientName || "A patient"} booked an appointment.`,
           type: "appointment",
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           time: new Date().toLocaleString(),
@@ -138,7 +128,83 @@ exports.notifyAppointmentBooked = onDocumentCreated(
 );
 
 /* =========================================
-   🔐 ADMIN ROLE ASSIGNMENT (CUSTOM CLAIMS)
+   CREATE VIDEO ROOM + LINK TO APPOINTMENT (FIXED CORE LOGIC)
+========================================= */
+exports.createVideoRoomOnAppointment = onDocumentCreated(
+  "appointments/{appointmentId}",
+  async (event) => {
+    try {
+      const data = event.data.data();
+      const appointmentId = event.params.appointmentId;
+
+      if (!data.doctorId || !data.patientId) {
+        console.log("Missing doctorId or patientId");
+        return;
+      }
+
+      // ✅ CREATE ROOM
+      const roomRef = admin.firestore().collection("videoRooms").doc();
+      const roomId = roomRef.id;
+
+      await roomRef.set({
+        roomId,
+        appointmentId,
+        doctorId: data.doctorId,
+        patientId: data.patientId,
+        offer: null,
+        answer: null,
+        offerCandidates: [],
+        answerCandidates: [],
+        active: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // 🔥 LINK ROOM BACK TO APPOINTMENT (CRITICAL FIX)
+      await admin
+        .firestore()
+        .collection("appointments")
+        .doc(appointmentId)
+        .update({
+          roomId,
+        });
+
+      console.log("Video room created + linked successfully");
+    } catch (error) {
+      console.error(error);
+    }
+  },
+);
+
+/* =========================================
+   VIDEO ROOM NOTIFICATION
+========================================= */
+exports.notifyVideoRoomCreated = onDocumentCreated(
+  "videoRooms/{roomId}",
+  async (event) => {
+    try {
+      const data = event.data.data();
+      const roomId = event.params.roomId;
+
+      await admin
+        .firestore()
+        .collection("notifications")
+        .add({
+          title: "Video Consultation Ready",
+          message: `Room ${roomId} is ready for consultation`,
+          type: "video",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          time: new Date().toLocaleString(),
+        });
+
+      console.log("Video room notification created");
+    } catch (error) {
+      console.error(error);
+    }
+  },
+);
+
+/* =========================================
+   ADMIN ROLE ASSIGNMENT
 ========================================= */
 exports.setAdminRole = onCall(async (request) => {
   try {

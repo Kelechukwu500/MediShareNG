@@ -2,20 +2,54 @@ import { useParams, useNavigate } from "react-router-dom";
 import { addDoc, collection } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { CalendarDays } from "lucide-react";
+import { updateDoc } from "firebase/firestore";
+import { Link } from "react-router-dom";
 
 const BookConsultation = () => {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const handleBook = async () => {
-    await addDoc(collection(db, "appointments"), {
-      doctorId: id,
-      patientId: auth.currentUser.uid,
-      status: "pending",
-    });
+ const handleBook = async () => {
+   const user = auth.currentUser;
 
-    navigate("/choose-doctor");
-  };
+   if (!user) return;
+
+   try {
+     // 1. CREATE APPOINTMENT
+     const appointmentRef = await addDoc(collection(db, "appointments"), {
+       doctorId: id,
+       patientId: user.uid,
+       status: "pending",
+       createdAt: new Date(),
+       patientName: user.email,
+        doctorName: "doctor.Name", // You can fetch the doctor's name based on the ID if needed
+      
+     });
+
+     // 2. CREATE VIDEO ROOM (🔥 IMPORTANT MISSING PIECE)
+     const roomRef = await addDoc(collection(db, "videoRooms"), {
+       doctorId: id,
+       patientId: user.uid,
+       appointmentId: appointmentRef.id,
+       offer: null,
+       answer: null,
+       offerCandidates: [],
+       answerCandidates: [],
+       active: false,
+       createdAt: new Date(),
+     });
+
+     // 3. LINK ROOM TO APPOINTMENT
+     await updateDoc(appointmentRef, {
+       roomId: roomRef.id,
+     });
+
+     // 4. GO TO VIDEO CALL
+     navigate(`/videocall/${roomRef.id}`);
+   } catch (error) {
+     console.error("Booking error:", error);
+   }
+ };
 
   return (
     <section className="min-h-screen bg-gray-200 via-white to-[#dcfce7] pt-28 pb-16 px-4 sm:px-6 lg:px-8">
@@ -69,12 +103,15 @@ const BookConsultation = () => {
           </button>
 
           {/* Back Button */}
+
+          <Link to="/doctors-page">
           <button
             onClick={() => navigate("/choose-doctor")}
             className="w-full mt-4 border border-[#065f46] text-[#065f46] hover:bg-[#065f46] hover:text-white p-4 rounded-2xl font-semibold transition-all duration-300"
           >
             Back to Doctors
           </button>
+          </Link>
         </div>
       </div>
     </section>

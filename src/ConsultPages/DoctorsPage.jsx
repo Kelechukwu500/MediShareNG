@@ -1,8 +1,27 @@
-import React from "react";
-import { doctors } from "../components/DoctorsData";
+import React, { useEffect, useState } from "react";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
+
 import DoctorCard from "../components/DoctorCard";
 
-const Doctors = () => {
+const DoctorsPage = () => {
+  // ✅ 1. STATE goes here
+  const [doctors, setDoctors] = useState([]);
+
+  // ✅ 2. FIRESTORE LISTENER goes here
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "doctors"), (snap) => {
+      setDoctors(
+        snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        })),
+      );
+    });
+
+    return () => unsub();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <h1 className="text-3xl font-bold text-center text-green-700 mb-8">
@@ -18,4 +37,4 @@ const Doctors = () => {
   );
 };
 
-export default Doctors;
+export default DoctorsPage;

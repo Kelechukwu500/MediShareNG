@@ -41,7 +41,7 @@ const ConsultationFlow = () => {
       icon: <Video size={34} />,
       title: "Start Video Session",
       text: "Connect securely with your doctor through HD video consultation from anywhere using MediShareNG.",
-      route: "/video-session",
+      route: "/doctor-dashboard",
     },
   ];
 

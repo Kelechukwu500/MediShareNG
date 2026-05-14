@@ -34,6 +34,11 @@ const Login = () => {
 
       const snap = await getDoc(userRef);
 
+      const userData = snap.data();
+
+      localStorage.setItem("userRole", userData.role);
+      localStorage.setItem("userId", userCred.user.uid);
+
       if (snap.exists()) {
         const userData = snap.data();
 
@@ -93,7 +98,7 @@ const Login = () => {
             onClick={() => navigate("/signup")}
             className="text-green-600 font-semibold cursor-pointer hover:underline"
           >
-            Sign up
+            Sign Up
           </span>
         </p>
       </form>

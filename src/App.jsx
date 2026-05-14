@@ -45,8 +45,9 @@ import MeetOurBoard from "./FooterPages/MeetOurBoard"
 import Signup from "./ConsultPages/Signup"
 import Login from "./ConsultPages/Login"
 import DoctorsPage from "./ConsultPages/DoctorsPage"
-import DoctorCard from "./components/DoctorCard"
-import { doctors } from "./components/DoctorsData"
+import DoctorDashboard from './ConsultPages/DoctorDashboard'
+
+import VideoCall from "./ConsultPages/VideoCall"
 import BookConsultation from "./ConsultPages/BookConsultation"
 
 
@@ -79,7 +80,6 @@ const App = () => {
         <Route path="/" element={<Home />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/history" element={<History />} />
-
 
         <Route
           path="/admin-dashboard"
@@ -122,14 +122,9 @@ const App = () => {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/doctors-page" element={<DoctorsPage />} />
-        <Route
-          path="/doctor-card"
-          element={<DoctorCard doctor={doctors[0]} />}
-        />
-        <Route
-          path="/doctors-data"
-          element={<div>{JSON.stringify(doctors)}</div>}
-        />
+        <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
+        <Route path="/videocall/:roomId" element={<VideoCall />} />
+
         <Route path="/book-consultation" element={<BookConsultation />} />
       </Routes>
       <Footer />
