@@ -203,10 +203,7 @@ const OnlineConsultation = () => {
                   {item.text}
                 </p>
 
-                <button className="mt-6 text-[#2bb673] font-semibold flex items-center gap-2">
-                  Learn More
-                  <ArrowRight size={18} />
-                </button>
+               
               </div>
             ))}
           </div>
@@ -299,9 +296,12 @@ const OnlineConsultation = () => {
                   </button>
                 </Link>
 
+                <Link to="/view-specialists">
+
                 <button className="border border-white/30 bg-white/10 hover:bg-white/20 backdrop-blur-md transition-all duration-300 px-8 h-14 rounded-2xl font-semibold">
                   View Specialists
                 </button>
+                </Link>
               </div>
             </div>
           </div>

@@ -142,10 +142,7 @@ const LaboratoryTests = () => {
 
                 <p className="mt-3 text-gray-600">{item.text}</p>
 
-                <button className="mt-6 text-[#2bb673] font-semibold flex items-center gap-2">
-                  Learn More
-                  <ArrowRight size={16} />
-                </button>
+                
               </motion.div>
             ))}
           </div>
@@ -162,9 +159,11 @@ const LaboratoryTests = () => {
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row justify-center gap-5">
+              <Link to="/video-call">
               <button className="bg-white text-[#065f46] px-8 h-14 rounded-2xl font-semibold">
                 Book Now
               </button>
+              </Link>
 
             <Link to="/lab-finder">
               <button className="border border-white/30 bg-white/10 px-8 h-14 rounded-2xl font-semibold">

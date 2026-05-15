@@ -24,7 +24,7 @@ const Services = () => {
       {/* ================= HERO ================= */}
       <div className="text-center px-4 md:px-10 pt-20 pb-14">
         <span className="bg-emerald-100 text-emerald-700 px-5 py-2 rounded-full text-sm font-semibold shadow-sm">
-          MedConnectNG Healthcare Ecosystem
+          MediShare Healthcare Ecosystem
         </span>
 
         <h1 className="text-4xl md:text-6xl font-black mt-6 text-gray-900 leading-tight">
@@ -35,7 +35,7 @@ const Services = () => {
         </h1>
 
         <p className="mt-6 text-gray-600 max-w-4xl mx-auto text-base md:text-lg leading-relaxed">
-          Experience healthcare beyond traditional systems. MedConnectNG brings
+          Experience healthcare beyond traditional systems. MediShareNG brings
           together AI-powered diagnostics, secure health records, certified
           specialists, wellness coaching, digital pharmacy delivery, and smart
           diagnostics into one connected ecosystem designed for speed,
@@ -250,7 +250,7 @@ const SectionCard = ({
       </div>
 
       {/* BUTTON */}
-      <Link to={route}>
+      <Link to="/consultation-flow">
         <button className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-3 rounded-xl text-sm font-semibold transition duration-300">
           Explore More
           <ArrowRight size={16} />

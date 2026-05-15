@@ -1,22 +1,31 @@
-import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { FaHospital, FaUserMd, FaHandshake, FaMedkit } from "react-icons/fa";
+import React, { useState, useEffect } from "react";
 import partner from "../assets/partner.jpg";
 
-/* FIREBASE */
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 
 const BecomeAPartner = () => {
+  const [user, setUser] = useState(null);
+
   const [formData, setFormData] = useState({
     name: "",
-    email: "",
     organization: "",
+    phone: "",
+    officeAddress: "",
+    state: "",
+    idType: "",
+    idNumber: "",
     message: "",
   });
 
-  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    return () => unsub();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -24,202 +33,175 @@ const BecomeAPartner = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!user) {
+      alert("You must be logged in to become a partner.");
+      return;
+    }
+
+    if (loading) return; // prevent double submit
+
     setLoading(true);
 
     try {
       await addDoc(collection(db, "partnerRequests"), {
-        ...formData,
+        name: formData.name,
+        organization: formData.organization,
+        phone: formData.phone,
+        officeAddress: formData.officeAddress,
+        state: formData.state,
+        idType: formData.idType,
+        idNumber: formData.idNumber,
+        message: formData.message,
+
+        userId: user.uid,
+        email: user.email,
+
+        // 🔥 NEW CONSISTENT SYSTEM FIELDS
+        status: "pending",
+        verified: false, // ✅ IMPORTANT NEW FIELD
+        read: false,
+
         createdAt: serverTimestamp(),
       });
 
       setSubmitted(true);
+
       setFormData({
         name: "",
-        email: "",
         organization: "",
+        phone: "",
+        officeAddress: "",
+        state: "",
+        idType: "",
+        idNumber: "",
         message: "",
       });
 
-      setTimeout(() => setSubmitted(false), 4000);
-    } catch (error) {
-      console.error("Error submitting form:", error);
-      alert("Something went wrong. Please try again.");
+      setTimeout(() => setSubmitted(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert("Error submitting request");
     }
 
     setLoading(false);
   };
 
-  const floatingIcon = (delay = 0) => ({
-    y: [0, -15, 0],
-    transition: {
-      duration: 3,
-      repeat: Infinity,
-      delay,
-      ease: "easeInOut",
-    },
-  });
-
   return (
-    <div className="w-full bg-gray-200 py-12 md:py-16 px-4 sm:px-6 lg:px-20 relative overflow-hidden">
-      {/* Floating Icons (hidden on small screens for cleanliness) */}
-      <div className="hidden md:block absolute top-10 left-10 text-green-600 text-3xl">
-        <motion.div animate={floatingIcon(0)}>
-          <FaHospital />
-        </motion.div>
-      </div>
-
-      <div className="hidden md:block absolute top-20 right-16 text-blue-600 text-3xl">
-        <motion.div animate={floatingIcon(0.5)}>
-          <FaUserMd />
-        </motion.div>
-      </div>
-
-      <div className="hidden md:block absolute bottom-20 left-20 text-purple-600 text-3xl">
-        <motion.div animate={floatingIcon(1)}>
-          <FaHandshake />
-        </motion.div>
-      </div>
-
-      <div className="hidden md:block absolute bottom-10 right-10 text-red-500 text-3xl">
-        <motion.div animate={floatingIcon(1.5)}>
-          <FaMedkit />
-        </motion.div>
-      </div>
-
-      {/* HEADER */}
-      <div className="text-center mb-10 md:mb-14">
-        <h1 className="text-2xl sm:text-3xl md:text-5xl font-bold text-gray-800">
-          Become a Partner
-        </h1>
-        <p className="text-gray-500 mt-2 md:mt-3 text-sm md:text-base">
-          Join our healthcare network and grow with us
-        </p>
-
-        <div className="flex justify-center gap-2 md:gap-3 mt-4 flex-wrap">
-          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs md:text-sm">
-            Trusted Network
-          </span>
-          <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs md:text-sm">
-            Fast Collaboration
-          </span>
-          <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs md:text-sm">
-            Verified Institutions
-          </span>
-        </div>
-      </div>
-
-      {/* MAIN GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
+    <div className="w-full bg-gray-100 py-12 px-4">
+      <div className="max-w-6xl mx-auto grid lg:grid-cols-2 gap-10">
         {/* IMAGE */}
-        <motion.div
-          initial={{ opacity: 0, x: -30 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-          className="rounded-2xl overflow-hidden shadow-xl"
-        >
-          <img
-            src={partner}
-            alt="Partner"
-            className="w-full h-64 sm:h-80 md:h-full object-cover"
-          />
-        </motion.div>
+        <img
+          src={partner}
+          alt="Partner"
+          className="rounded-2xl h-full object-cover"
+        />
 
         {/* FORM */}
-        <motion.div
-          initial={{ opacity: 0, x: 30 }}
-          whileInView={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6 }}
-          className="bg-white p-5 sm:p-6 md:p-10 rounded-2xl shadow-xl"
-        >
-          <h2 className="text-xl md:text-2xl font-semibold mb-5 md:mb-6 text-gray-800">
-            Partnership Form
-          </h2>
+        <div className="bg-white p-6 rounded-2xl shadow-lg">
+          {!user ? (
+            <p className="text-red-600 font-semibold">
+              Please login to submit partnership request
+            </p>
+          ) : (
+            <p className="text-green-600 mb-4">Logged in as: {user.email}</p>
+          )}
 
           {submitted && (
-            <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-lg text-sm">
-              🎉 Submitted successfully!
+            <div className="bg-green-100 p-2 rounded mb-3 text-green-700">
+              Request submitted successfully
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <input
-              type="text"
               name="name"
               placeholder="Full Name"
+              onChange={handleChange}
               value={formData.name}
-              onChange={handleChange}
-              className="w-full p-3 border rounded-lg text-sm md:text-black focus:ring-2 focus:ring-gray-300"
+              className="w-full p-3 border rounded"
               required
             />
 
             <input
-              type="email"
-              name="email"
-              placeholder="Email Address"
-              value={formData.email}
-              onChange={handleChange}
-              className="w-full p-3 border rounded-lg text-sm md:text-black focus:ring-2 focus:ring-gray-300"
-              required
-            />
-
-            <input
-              type="text"
               name="organization"
-              placeholder="Hospital / Organization"
-              value={formData.organization}
+              placeholder="Organization"
               onChange={handleChange}
-              className="w-full p-3 border rounded-lg text-sm md:text-black focus:ring-2 focus:ring-gray-300"
+              value={formData.organization}
+              className="w-full p-3 border rounded"
+              required
+            />
+
+            <input
+              name="phone"
+              placeholder="Phone Number"
+              onChange={handleChange}
+              value={formData.phone}
+              className="w-full p-3 border rounded"
+              required
+            />
+
+            <input
+              name="officeAddress"
+              placeholder="Office Address"
+              onChange={handleChange}
+              value={formData.officeAddress}
+              className="w-full p-3 border rounded"
+              required
+            />
+
+            <input
+              name="state"
+              placeholder="State of Residence"
+              onChange={handleChange}
+              value={formData.state}
+              className="w-full p-3 border rounded"
+              required
+            />
+
+            <select
+              name="idType"
+              onChange={handleChange}
+              value={formData.idType}
+              className="w-full p-3 border rounded"
+              required
+            >
+              <option value="">Select ID Type</option>
+              <option value="International Passport">
+                International Passport
+              </option>
+              <option value="Driver's License">Driver's License</option>
+              <option value="Voter's Card">Voter's Card</option>
+              <option value="NIN">NIN</option>
+              <option value="National ID">National ID</option>
+            </select>
+
+            <input
+              name="idNumber"
+              placeholder="ID Number"
+              onChange={handleChange}
+              value={formData.idNumber}
+              className="w-full p-3 border rounded"
               required
             />
 
             <textarea
               name="message"
-              placeholder="Tell us about your partnership interest..."
-              value={formData.message}
+              placeholder="Message"
               onChange={handleChange}
-              rows="4"
-              className="w-full p-3 border rounded-lg text-sm md:text-black focus:ring-2 focus:ring-gray-300"
+              value={formData.message}
+              className="w-full p-3 border rounded"
               required
             />
 
             <button
-              type="submit"
               disabled={loading}
-              className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition text-sm md:text-base"
+              className="w-full bg-green-600 text-white p-3 rounded"
             >
-              {loading ? "Submitting..." : "Submit Partnership Request"}
+              {loading ? "Submitting..." : "Submit"}
             </button>
           </form>
-        </motion.div>
-      </div>
-
-      {/* CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-12 md:mt-16">
-        {[
-          {
-            title: "Healthcare Integration",
-            desc: "Seamless system integration with hospitals.",
-          },
-          {
-            title: "Data Collaboration",
-            desc: "Secure real-time medical data sharing.",
-          },
-          {
-            title: "Growth Partnership",
-            desc: "Expand healthcare reach globally.",
-          },
-        ].map((item, i) => (
-          <motion.div
-            key={i}
-            whileHover={{ scale: 1.03 }}
-            className="bg-white p-5 md:p-6 rounded-2xl shadow-md border"
-          >
-            <h3 className="text-base md:text-lg font-semibold text-gray-800 mb-2">
-              {item.title}
-            </h3>
-            <p className="text-gray-500 text-sm">{item.desc}</p>
-          </motion.div>
-        ))}
+        </div>
       </div>
     </div>
   );

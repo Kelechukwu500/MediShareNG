@@ -20,31 +20,37 @@ const History = () => {
       icon: <MapPin size={28} />,
       title: "Accessibility",
       text: "We make healthcare services easier to discover and access for everyone.",
+      route: "/accessibility",
     },
     {
       icon: <ShieldCheck size={28} />,
       title: "Transparency",
       text: "Clear service information and pricing for informed healthcare decisions.",
+      route: "/transparency",
     },
     {
       icon: <Clock3 size={28} />,
       title: "Efficiency",
       text: "Connecting patients and providers faster with fewer barriers.",
+      route: "/efficiency",
     },
     {
       icon: <LaptopMinimal size={28} />,
       title: "Innovation",
       text: "Using modern technology to improve healthcare access and experiences.",
+      route: "/innovation",
     },
     {
       icon: <BadgeCheck size={28} />,
       title: "Trust",
       text: "Building reliable relationships between users and verified providers.",
+      route: "/trust",
     },
     {
       icon: <Users size={28} />,
       title: "Patient-Centered",
       text: "Putting the needs and convenience of patients first always.",
+      route: "/patient-centered",
     },
   ];
 
@@ -54,7 +60,7 @@ const History = () => {
         {/* HERO */}
         <div className="text-center mb-14 sm:mb-16">
           <button className="px-4 sm:px-6 py-2 rounded-full bg-emerald-100 text-emerald-700 font-semibold shadow-lg mb-5 text-sm sm:text-base">
-            MedConnectNG
+            MediShareNG
           </button>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-gray-900 leading-tight">
@@ -63,19 +69,24 @@ const History = () => {
           </h1>
 
           <p className="max-w-3xl mx-auto text-gray-600 text-base sm:text-lg mt-5 sm:mt-6 leading-relaxed px-2">
-            MedConnectNG is a digital healthcare marketplace connecting
+            MediShareNG is a digital healthcare marketplace connecting
             individuals with trusted healthcare providers across Nigeria and
             beyond through a seamless and transparent experience.
           </p>
 
           <div className="flex flex-col sm:flex-row flex-wrap justify-center items-center gap-4 mt-8">
-            <button className="w-full sm:w-auto bg-emerald-600 text-white px-6 sm:px-8 py-3 rounded-full shadow-lg hover:scale-105 transition">
-              Explore Services
-            </button>
+            <Link to="/services">
+              <button className="w-full sm:w-auto bg-emerald-600 text-white px-6 sm:px-8 py-3 rounded-full shadow-lg hover:scale-105 transition">
+                Explore Services
+              </button>
+            </Link>
+
+            <Link to="/view-specialists">
 
             <button className="w-full sm:w-auto bg-white border border-emerald-200 text-emerald-700 px-6 sm:px-8 py-3 rounded-full shadow-lg hover:bg-emerald-50 transition">
               Trusted Providers
             </button>
+            </Link>
           </div>
         </div>
 
@@ -202,12 +213,15 @@ const History = () => {
                   {value.text}
                 </p>
 
-                <button
-                  onClick={() => navigate("/learn-more")}
-                  className="mt-6 px-5 py-2 rounded-full bg-gray-100 text-gray-700 shadow-lg text-sm sm:text-base hover:bg-gray-200 transition"
+                <Link
+                  to={`/values/${value.title
+                    .toLowerCase()
+                    .replace(/\s+/g, "-")}`}
                 >
-                  Learn More
-                </button>
+                  <button className="mt-6 px-5 py-2 rounded-full bg-gray-100 text-gray-700 shadow-lg text-sm sm:text-base hover:bg-gray-200 transition">
+                    Learn More
+                  </button>
+                </Link>
               </div>
             ))}
           </div>
@@ -217,7 +231,7 @@ const History = () => {
         <div className="mt-20 sm:mt-24 text-center">
           <div className="bg-white border border-emerald-100 rounded-3xl shadow-2xl p-6 sm:p-8 lg:p-10">
             <h2 className="text-2xl sm:text-3xl font-black text-gray-900 mb-5">
-              MedConnectNG
+              MediShareNG
             </h2>
 
             <p className="text-gray-600 max-w-3xl mx-auto text-base sm:text-lg leading-relaxed">

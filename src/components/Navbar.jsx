@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import navlogo from "../assets/navlogo.jpg";
+import medilogo3 from "../assets/medilogo3.jpg";
 import { Link } from "react-router-dom";
 
 const Navbar = () => {
@@ -10,10 +10,11 @@ const Navbar = () => {
       <div className="mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8">
         {/* MAIN NAV */}
         <div className="flex h-16 items-center justify-between">
+
           {/* Logo */}
           <a href="#" className="flex items-center text-teal-600">
             <span className="sr-only">Home</span>
-            <img src={navlogo} alt="Logo" className="h-15 w-15" />
+            <img src={medilogo3} alt="Logo" className="h-28 w-25" />
           </a>
 
           {/* Desktop Menu */}
@@ -52,28 +53,7 @@ const Navbar = () => {
                 </Link>
               </li>
 
-              {/* 🔍 SEARCH ICON */}
-              <li>
-                <Link
-                  to="/search"
-                  className="text-gray-600 hover:text-gray-900 transition"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-5 w-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M21 21l-4.35-4.35m1.35-5.65a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </Link>
-              </li>
+              
             </ul>
           </nav>
 

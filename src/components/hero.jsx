@@ -437,139 +437,91 @@ const Hero = () => {
       {/* ==================== ECOSYSTEM SECTION ==================== */}
       <EcosystemSection />
 
-      <section class="w-full bg-gray-200 py-16 px-6">
-        <div class="max-w-7xl mx-auto">
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div class="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
-              <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mb-6">
+      <section className="w-full bg-gray-200 py-16 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
+              <div className="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center mb-6">
                 💬
               </div>
-              <h3 class="text-2xl font-bold text-emerald-800 mb-3">
+              <h3 className="text-2xl font-bold text-emerald-800 mb-3">
                 AI Symptom Checker
               </h3>
-              <p class="text-gray-600 leading-relaxed mb-8">
+              <p className="text-gray-600 leading-relaxed mb-8">
                 Our proprietary LLM analyzes your symptoms and provides an
                 immediate triage level before you even book a call.
               </p>
-              <Link
-                to="/ai-symptoms-checker"
-                className="inline-flex items-center text-emerald-600 hover:text-emerald-700 font-medium group"
-              >
-                Explore More
-                <span className="ml-2 transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </Link>
+              
             </div>
 
-            <div class="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
-              <div class="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mb-6">
+            <div className="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
+              <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mb-6">
                 📋
               </div>
-              <h3 class="text-2xl font-bold text-emerald-800 mb-3">
+              <h3 className="text-2xl font-bold text-emerald-800 mb-3">
                 Smart Health Records
               </h3>
-              <p class="text-gray-600 leading-relaxed mb-8">
+              <p className="text-gray-600 leading-relaxed mb-8">
                 All your lab results, prescriptions, and medical history stored
                 in a secure, immutable digital vault accessible anywhere.
               </p>
-              <Link
-                to="/smart-health-records"
-                className="inline-flex items-center text-emerald-600 hover:text-emerald-700 font-medium group"
-              >
-                Explore More
-                <span className="ml-2 transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </Link>
+              
             </div>
 
-            <div class="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
-              <div class="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center mb-6">
+            <div className="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
+              <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center mb-6">
                 🏅
               </div>
-              <h3 class="text-2xl font-bold text-emerald-800 mb-3">
+              <h3 className="text-2xl font-bold text-emerald-800 mb-3">
                 Certified Specialists
               </h3>
-              <p class="text-gray-600 leading-relaxed mb-8">
+              <p className="text-gray-600 leading-relaxed mb-8">
                 Connect with board-certified practitioners across 40+
                 specialties within minutes via HD video or chat.
               </p>
-              <Link
-                to="/certified-specialists"
-                className="inline-flex items-center text-emerald-600 hover:text-emerald-700 font-medium group"
-              >
-                Explore More
-                <span className="ml-2 transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </Link>
+             
             </div>
 
-            <div class="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
-              <div class="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center mb-6">
+            <div className="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
+              <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center mb-6">
                 💊
               </div>
-              <h3 class="text-2xl font-bold text-emerald-800 mb-3">
+              <h3 className="text-2xl font-bold text-emerald-800 mb-3">
                 Digital Pharmacy
               </h3>
-              <p class="text-gray-600 leading-relaxed mb-8">
+              <p className="text-gray-600 leading-relaxed mb-8">
                 Prescriptions are sent instantly to our network pharmacies for
                 same-day delivery right to your front door.
               </p>
-              <Link
-                to="/digital-pharmacy"
-                className="inline-flex items-center text-emerald-600 hover:text-emerald-700 font-medium group"
-              >
-                Explore More
-                <span className="ml-2 transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </Link>
+              
             </div>
 
-            <div class="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
-              <div class="w-12 h-12 bg-cyan-100 rounded-2xl flex items-center justify-center mb-6">
+            <div className="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
+              <div className="w-12 h-12 bg-cyan-100 rounded-2xl flex items-center justify-center mb-6">
                 🧪
               </div>
-              <h3 class="text-2xl font-bold text-emerald-800 mb-3">
+              <h3 className="text-2xl font-bold text-emerald-800 mb-3">
                 Connected Diagnostics
               </h3>
-              <p class="text-gray-600 leading-relaxed mb-8">
+              <p className="text-gray-600 leading-relaxed mb-8">
                 Schedule home-collection for lab tests. Results sync directly to
                 your profile and your doctor's dashboard.
               </p>
-              <Link
-                to="/connected-diagnostics"
-                className="inline-flex items-center text-emerald-600 hover:text-emerald-700 font-medium group"
-              >
-                Explore More
-                <span className="ml-2 transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </Link>
+              
             </div>
 
-            <div class="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
-              <div class="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center mb-6">
+            <div className="bg-white rounded-3xl p-8 shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 group">
+              <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center mb-6">
                 🧘
               </div>
-              <h3 class="text-2xl font-bold text-emerald-800 mb-3">
+              <h3 className="text-2xl font-bold text-emerald-800 mb-3">
                 Wellness Coaching
               </h3>
-              <p class="text-gray-600 leading-relaxed mb-8">
+              <p className="text-gray-600 leading-relaxed mb-8">
                 Ongoing support for mental health, nutrition, and chronic
                 condition management from dedicated professionals.
               </p>
-              <Link
-                to="/wellness-coaching"
-                className="inline-flex items-center text-emerald-600 hover:text-emerald-700 font-medium group"
-              >
-                Explore More
-                <span className="ml-2 transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </Link>
+             
             </div>
           </div>
         </div>

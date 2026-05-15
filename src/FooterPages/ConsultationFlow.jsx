@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   BadgeCheck,
   UserPlus,
@@ -46,7 +47,7 @@ const ConsultationFlow = () => {
   ];
 
   return (
-    <section className="w-full bg-[#f5f7f6] overflow-hidden py-20 px-4 sm:px-6 lg:px-10">
+    <section className="w-full bg-gray-200 overflow-hidden py-20 px-4 sm:px-6 lg:px-10">
       <div className="max-w-7xl mx-auto">
         {/* TOP HEADING */}
         <div className="text-center max-w-4xl mx-auto">
@@ -134,13 +135,15 @@ const ConsultationFlow = () => {
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-5 mt-10">
-                  <button className="bg-white text-[#065f46] hover:bg-gray-100 transition-all duration-300 px-8 h-14 rounded-2xl font-semibold shadow-xl">
-                    Start Consultation
-                  </button>
+                  
+
+                    <Link to="/view-specialists">
 
                   <button className="border border-white/30 bg-white/10 hover:bg-white/20 transition-all duration-300 px-8 h-14 rounded-2xl font-semibold backdrop-blur-md">
                     Explore Doctors
                   </button>
+                  </Link>
+                  
                 </div>
               </div>
 

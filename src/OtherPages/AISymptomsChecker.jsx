@@ -6,17 +6,24 @@ import {
   MicOff,
   Download,
   ArrowLeft,
-  AlertTriangle,
   Shield,
+  AlertTriangle,
 } from "lucide-react";
+
 import jsPDF from "jspdf";
+
+/* =========================
+   FIREBASE IMPORTS
+========================= */
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../firebase";
 
 const AISymptomsChecker = ({ onClose }) => {
   const [messages, setMessages] = useState([
     {
       type: "bot",
       content:
-        "Hello! I'm MedAI. Describe your symptoms and I'll provide instant analysis & triage.",
+        "Hello! I'm MedAI. Describe your symptoms and I'll provide instant AI analysis and triage support.",
       triage: null,
     },
   ]);
@@ -25,22 +32,28 @@ const AISymptomsChecker = ({ onClose }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [triageLevel, setTriageLevel] = useState(null);
-  const [severityData, setSeverityData] = useState({
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
+
+  const [severityData] = useState({
     pain: 5,
     fatigue: 5,
     fever: 0,
     breathing: 0,
   });
-  const [showDisclaimer, setShowDisclaimer] = useState(true);
 
-  const handleSeverityChange = (key, value) => {
-    setSeverityData((prev) => ({ ...prev, [key]: value }));
-  };
+  const analyzeSymptoms = httpsCallable(functions, "analyzeSymptoms");
 
+  /* =========================
+     VOICE INPUT
+  ========================= */
   const startVoiceInput = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return alert("Voice not supported");
+
+    if (!SpeechRecognition) {
+      alert("Voice recognition is not supported.");
+      return;
+    }
 
     const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
@@ -49,127 +62,197 @@ const AISymptomsChecker = ({ onClose }) => {
     recognition.onend = () => setIsListening(false);
 
     recognition.onresult = (event) => {
-      const text = event.results[0][0].transcript;
-      setInput(text);
-      handleSend(text);
+      const transcript = event.results[0][0].transcript;
+      handleSend(transcript);
     };
 
     recognition.start();
   };
 
-  const callOpenAI = async (userMessage) => {
+  /* =========================
+     AI CALL
+  ========================= */
+  const callAIBackend = async (userMessage) => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer YOUR_OPENAI_API_KEY`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o-mini",
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are MedAI, a medical assistant. Always include triage level: Critical, High, Medium, Low.",
-              },
-              { role: "user", content: userMessage },
-            ],
-          }),
-        },
-      );
+      const response = await analyzeSymptoms({
+        symptoms: userMessage,
+        severityData,
+      });
 
-      const data = await response.json();
-      const reply = data.choices[0].message.content;
+      const reply = response?.data?.result;
 
-      let triage = "Medium";
-      if (reply.toLowerCase().includes("emergency")) triage = "Critical";
-      else if (reply.toLowerCase().includes("urgent")) triage = "High";
-      else if (reply.toLowerCase().includes("monitor")) triage = "Medium";
+      if (!reply) {
+        throw new Error("Empty AI response received");
+      }
 
-      setMessages((prev) => [...prev, { type: "bot", content: reply, triage }]);
+      let triage = "Moderate";
+      const lower = reply.toLowerCase();
 
-      setTriageLevel(triage);
-    } catch (err) {
+      if (lower.includes("critical")) triage = "Critical";
+      else if (lower.includes("high")) triage = "High";
+      else if (lower.includes("low")) triage = "Low";
+      else if (lower.includes("moderate")) triage = "Moderate";
+
       setMessages((prev) => [
         ...prev,
-        { type: "bot", content: "AI error. Try again.", triage: null },
+        {
+          type: "bot",
+          content: reply,
+          triage,
+        },
+      ]);
+
+      setTriageLevel(triage);
+    } catch (error) {
+      console.error("🔥 FULL FIREBASE FUNCTION ERROR:", {
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        stack: error?.stack,
+      });
+
+      let friendlyMessage = "AI service error occurred.";
+      let debugInfo = error?.message || "Unknown error";
+
+      /* =========================
+         ✅ 429 QUOTA HANDLING (MAIN FIX)
+      ========================= */
+      const isQuotaError =
+        error?.code === "functions/resource-exhausted" ||
+        error?.message?.includes("429") ||
+        error?.message?.toLowerCase()?.includes("quota");
+
+      if (isQuotaError) {
+        friendlyMessage =
+          "AI is currently unavailable due to quota limits. Please try again later or upgrade your OpenAI plan.";
+
+        // optional frontend-safe fallback structure (your requested snippet adapted properly)
+        const fallback = {
+          result: friendlyMessage,
+        };
+
+        debugInfo = JSON.stringify(fallback);
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          type: "bot",
+          content: `${friendlyMessage}\n\nDebug: ${debugInfo}`,
+          triage: null,
+        },
       ]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  /* =========================
+     SEND MESSAGE
+  ========================= */
   const handleSend = (voiceText = null) => {
     const text = voiceText || input;
     if (!text.trim()) return;
 
-    setMessages((prev) => [...prev, { type: "user", content: text }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        type: "user",
+        content: text,
+      },
+    ]);
+
     setInput("");
-    callOpenAI(text);
+    callAIBackend(text);
   };
 
+  /* =========================
+     PDF EXPORT
+  ========================= */
   const generatePDF = () => {
     const doc = new jsPDF();
-    doc.text("MedConnectNG AI Report", 20, 20);
+
+    doc.setFontSize(18);
+    doc.text("MedConnectNG AI Symptom Report", 20, 20);
+
+    let y = 40;
+
+    messages.forEach((msg) => {
+      const role = msg.type === "user" ? "User" : "MedAI";
+      const lines = doc.splitTextToSize(`${role}: ${msg.content}`, 170);
+
+      doc.text(lines, 20, y);
+      y += lines.length * 8;
+
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+    });
+
     doc.save("medai-report.pdf");
+  };
+
+  /* =========================
+     TRIAGE COLORS
+  ========================= */
+  const getTriageColor = () => {
+    switch (triageLevel) {
+      case "Critical":
+        return "bg-red-600";
+      case "High":
+        return "bg-orange-500";
+      case "Low":
+        return "bg-green-600";
+      default:
+        return "bg-yellow-500";
+    }
   };
 
   return (
     <div className="w-full min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-3 md:p-6">
-      <div className="w-full max-w-6xl bg-white rounded-2xl md:rounded-3xl shadow-xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-6xl bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden">
         {/* HEADER */}
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white p-4 md:p-6 flex justify-between items-center">
-          <div className="flex items-center gap-3 md:gap-4">
-            <Bot />
+        <div className="bg-emerald-600 text-white p-4 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <Bot size={28} />
             <div>
-              <h1 className="text-lg md:text-2xl font-bold">
-                MedAI Symptoms Checker
-              </h1>
-              <p className="text-xs md:text-sm text-white/80">
+              <h1 className="font-bold text-lg">MedAI Symptoms Checker</h1>
+              <p className="text-xs opacity-80">
                 MedConnectNG Clinical AI Assistant
               </p>
             </div>
           </div>
 
-          {onClose && (
-            <button onClick={onClose}>
-              <ArrowLeft />
-            </button>
-          )}
+          {onClose && <ArrowLeft onClick={onClose} />}
         </div>
 
         {/* TRIAGE */}
         {triageLevel && (
           <div
-            className={`text-white px-4 py-2 text-sm font-medium ${
-              triageLevel === "Critical"
-                ? "bg-red-600"
-                : triageLevel === "High"
-                  ? "bg-orange-500"
-                  : "bg-yellow-500"
-            }`}
+            className={`${getTriageColor()} text-white px-4 py-2 flex gap-2`}
           >
-            ⚠ TRIAGE LEVEL: {triageLevel.toUpperCase()}
+            <AlertTriangle size={16} />
+            TRIAGE LEVEL: {triageLevel.toUpperCase()}
           </div>
         )}
 
-        {/* CHAT AREA */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-6 bg-gray-50 space-y-4">
+        {/* CHAT */}
+        <div className="flex-1 p-4 overflow-y-auto space-y-3 min-h-[500px]">
           {messages.map((msg, i) => (
             <div
               key={i}
-              className={`flex ${msg.type === "user" ? "justify-end" : "justify-start"}`}
+              className={`flex ${
+                msg.type === "user" ? "justify-end" : "justify-start"
+              }`}
             >
               <div
-                className={`max-w-[85%] md:max-w-[70%] p-3 md:p-4 rounded-xl text-sm md:text-base ${
+                className={`p-3 rounded-xl max-w-[80%] ${
                   msg.type === "user"
                     ? "bg-emerald-600 text-white"
-                    : "bg-white border"
+                    : "bg-gray-100"
                 }`}
               >
                 {msg.content}
@@ -178,41 +261,16 @@ const AISymptomsChecker = ({ onClose }) => {
           ))}
 
           {isLoading && (
-            <p className="text-emerald-600 text-sm">MedAI analyzing...</p>
+            <div className="text-emerald-600 flex items-center gap-2">
+              <Bot size={16} />
+              Analyzing symptoms...
+            </div>
           )}
         </div>
 
-        {/* SEVERITY */}
-        <div className="p-4 md:p-6 border-t bg-white">
-          <h3 className="font-semibold mb-3 text-sm md:text-base">
-            Symptom Severity
-          </h3>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.keys(severityData).map((key) => (
-              <div key={key}>
-                <label className="text-xs capitalize">{key}</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="10"
-                  value={severityData[key]}
-                  onChange={(e) =>
-                    handleSeverityChange(key, Number(e.target.value))
-                  }
-                  className="w-full accent-emerald-600"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* INPUT */}
-        <div className="p-3 md:p-4 border-t flex gap-2 bg-white">
-          <button
-            onClick={startVoiceInput}
-            className="p-3 bg-gray-100 rounded-xl"
-          >
+        <div className="p-3 border-t flex gap-2">
+          <button onClick={startVoiceInput} className="p-2 bg-gray-100 rounded">
             {isListening ? <MicOff /> : <Mic />}
           </button>
 
@@ -220,20 +278,20 @@ const AISymptomsChecker = ({ onClose }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            className="flex-1 border rounded px-3 py-2"
             placeholder="Describe symptoms..."
-            className="flex-1 border rounded-xl px-3 md:px-4 py-2 text-sm md:text-base"
           />
 
           <button
             onClick={() => handleSend()}
-            className="bg-emerald-600 text-white px-4 md:px-6 rounded-xl"
+            className="bg-emerald-600 text-white px-4 rounded"
           >
             <Send />
           </button>
 
           <button
             onClick={generatePDF}
-            className="bg-gray-800 text-white px-4 rounded-xl hidden md:block"
+            className="bg-gray-800 text-white px-4 rounded hidden md:flex"
           >
             <Download />
           </button>
@@ -241,17 +299,16 @@ const AISymptomsChecker = ({ onClose }) => {
 
         {/* DISCLAIMER */}
         {showDisclaimer && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-6 max-w-md text-center">
-              <Shield className="mx-auto text-emerald-600 mb-3" size={40} />
-              <h2 className="font-bold text-lg mb-2">Medical Disclaimer</h2>
-              <p className="text-sm text-gray-500">
-                This tool does not replace professional medical advice.
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
+            <div className="bg-white p-6 rounded-xl text-center max-w-sm">
+              <Shield className="mx-auto text-emerald-600 mb-3" />
+              <p className="text-sm">
+                This AI is not a medical diagnosis tool.
               </p>
 
               <button
                 onClick={() => setShowDisclaimer(false)}
-                className="mt-4 bg-emerald-600 text-white px-6 py-2 rounded-xl"
+                className="mt-4 bg-emerald-600 text-white px-4 py-2 rounded"
               >
                 I Understand
               </button>

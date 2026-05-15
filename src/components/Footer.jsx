@@ -159,10 +159,16 @@ const Footer = () => {
               <p className="text-xs uppercase font-semibold text-gray-400 mb-3">
                 Resources
               </p>
+              
+              
+                
               <div className="flex flex-col space-y-2 text-sm">
-                <Link to="/events" className="hover:text-white">
-                  Events
+                <Link to="/blog" className="hover:text-white">
+               
+                  Blog
                 </Link>
+
+              
               </div>
             </div>
           </div>

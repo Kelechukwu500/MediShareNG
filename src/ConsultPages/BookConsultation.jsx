@@ -12,9 +12,13 @@ const BookConsultation = () => {
  const handleBook = async () => {
    const user = auth.currentUser;
 
-   if (!user) return;
+     if (!user) {
+       navigate("/login");
+       return;
+     }
 
    try {
+    
      // 1. CREATE APPOINTMENT
      const appointmentRef = await addDoc(collection(db, "appointments"), {
        doctorId: id,
@@ -104,14 +108,14 @@ const BookConsultation = () => {
 
           {/* Back Button */}
 
-          <Link to="/doctors-page">
+          
           <button
             onClick={() => navigate("/choose-doctor")}
             className="w-full mt-4 border border-[#065f46] text-[#065f46] hover:bg-[#065f46] hover:text-white p-4 rounded-2xl font-semibold transition-all duration-300"
           >
             Back to Doctors
           </button>
-          </Link>
+          
         </div>
       </div>
     </section>
