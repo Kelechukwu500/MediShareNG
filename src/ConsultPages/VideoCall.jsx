@@ -1,45 +1,78 @@
-import React, { useEffect, useRef } from "react";
-import { useParams } from "react-router-dom";
-import { db } from "../firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import React, { useEffect, useRef, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { db, auth } from "../firebase";
+import { doc, getDoc } from "firebase/firestore";
 import useWebRTC from "../hooks/useWebRTC";
 
 const VideoCall = () => {
   const { roomId } = useParams();
+  const navigate = useNavigate();
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
 
-  // ⚠️ TEMP ROLE (later replace with auth logic)
-  
+  const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+  const [roomData, setRoomData] = useState(null);
+
+  const user = auth.currentUser;
+
   const userRole = localStorage.getItem("userRole");
   const userId = localStorage.getItem("userId");
 
   const isCaller = userRole === "doctor";
 
-  // ✅ FIX: prevent crash if roomId missing
-  const { localStream, remoteStream } = useWebRTC(roomId, userId, isCaller);
-
   // ===============================
-  // MARK ROOM ACTIVE
+  // VALIDATE ROOM ACCESS
   // ===============================
   useEffect(() => {
-    if (!roomId) {
-      return <div>No room found</div>;
-    }
+    const validateRoom = async () => {
+      if (!roomId || !userId) {
+        navigate("/login");
+        return;
+      }
 
-    const setupCall = async () => {
       try {
-        await updateDoc(doc(db, "videoRooms", roomId), {
-          active: true,
-        });
+        const roomRef = doc(db, "videoRooms", roomId);
+        const snap = await getDoc(roomRef);
+
+        if (!snap.exists()) {
+          navigate("/doctors-page");
+          return;
+        }
+
+        const data = snap.data();
+        setRoomData(data);
+
+        // ONLY allow doctor OR patient in room
+        const allowed = data.doctorId === userId || data.patientId === userId;
+
+        if (!allowed) {
+          navigate("/doctors-page");
+          return;
+        }
+
+        // BLOCK if not active yet
+        if (!data.active) {
+          alert("Waiting for doctor to start the session");
+        }
+
+        setAuthorized(true);
       } catch (error) {
-        console.error("Error updating room:", error);
+        console.error(error);
+        navigate("/doctors-page");
+      } finally {
+        setLoading(false);
       }
     };
 
-    setupCall();
-  }, [roomId]);
+    validateRoom();
+  }, [roomId, userId, navigate]);
+
+  // ===============================
+  // WEBRTC HOOK
+  // ===============================
+  const { localStream, remoteStream } = useWebRTC(roomId, userId, isCaller);
 
   // ===============================
   // ATTACH LOCAL STREAM
@@ -58,6 +91,21 @@ const VideoCall = () => {
       remoteVideoRef.current.srcObject = remoteStream.current;
     }
   }, [remoteStream]);
+
+  // ===============================
+  // LOADING STATE
+  // ===============================
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        Loading video session...
+      </div>
+    );
+  }
+
+  if (!authorized) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-black grid grid-cols-1 md:grid-cols-2 gap-4 p-4">

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db, auth } from "../firebase";
+import { useAuthState } from "react-firebase-hooks/auth";
 import {
   collection,
   onSnapshot,
@@ -13,15 +14,34 @@ import { useNavigate } from "react-router-dom";
 const DoctorDashboard = () => {
   const [appointments, setAppointments] = useState([]);
   const [videoRooms, setVideoRooms] = useState([]);
-  const navigate = useNavigate();
 
-  const doctor = auth.currentUser;
+  const navigate = useNavigate();
+  const [doctor, loading] = useAuthState(auth);
+
+  /* =========================
+     LOADING / AUTH GUARD
+  ========================== */
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!doctor) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Please login again
+      </div>
+    );
+  }
 
   /* =========================
      GET DOCTOR APPOINTMENTS
   ========================== */
   useEffect(() => {
-    if (!doctor) return;
+    if (!doctor?.uid) return;
 
     const q = query(
       collection(db, "appointments"),
@@ -30,9 +50,9 @@ const DoctorDashboard = () => {
 
     const unsub = onSnapshot(q, (snap) => {
       setAppointments(
-        snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
         })),
       );
     });
@@ -44,7 +64,7 @@ const DoctorDashboard = () => {
      GET VIDEO ROOMS
   ========================== */
   useEffect(() => {
-    if (!doctor) return;
+    if (!doctor?.uid) return;
 
     const q = query(
       collection(db, "videoRooms"),
@@ -53,9 +73,9 @@ const DoctorDashboard = () => {
 
     const unsub = onSnapshot(q, (snap) => {
       setVideoRooms(
-        snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
         })),
       );
     });
@@ -66,18 +86,34 @@ const DoctorDashboard = () => {
   /* =========================
      ACCEPT APPOINTMENT
   ========================== */
-  const acceptAppointment = async (id) => {
-    await updateDoc(doc(db, "appointments", id), {
-      status: "accepted",
-    });
+  const acceptAppointment = async (appointment) => {
+    try {
+      await updateDoc(doc(db, "appointments", appointment.id), {
+        status: "accepted",
+      });
+
+      // Activate room if exists
+      if (appointment.roomId) {
+        await updateDoc(doc(db, "videoRooms", appointment.roomId), {
+          active: true,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to accept appointment");
+    }
   };
 
   /* =========================
-     START VIDEO CALL (FIXED)
+     START VIDEO CALL
   ========================== */
-  const joinRoom = (roomId) => {
-    // THIS is the correct flow
-    navigate(`/videocall/${roomId}`);
+  const joinRoom = (room) => {
+    if (!room?.active) {
+      alert("This consultation is not active yet. Accept appointment first.");
+      return;
+    }
+
+    navigate(`/videocall/${room.id}`);
   };
 
   return (
@@ -104,13 +140,14 @@ const DoctorDashboard = () => {
                 <p className="font-semibold">
                   Patient: {a.patientName || "Unknown"}
                 </p>
+
                 <p className="text-sm text-gray-500">Status: {a.status}</p>
               </div>
 
               {a.status === "pending" && (
                 <button
-                  onClick={() => acceptAppointment(a.id)}
-                  className="bg-green-600 text-white px-3 py-1 rounded-lg"
+                  onClick={() => acceptAppointment(a)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg"
                 >
                   Accept
                 </button>
@@ -136,17 +173,19 @@ const DoctorDashboard = () => {
             >
               <div>
                 <p className="font-semibold">Room ID: {room.id}</p>
+
                 <p className="text-sm text-gray-500">
-                  Status: {room.active ? "Active" : "Waiting"}
+                  Status: {room.active ? "Active" : "Waiting Approval"}
                 </p>
               </div>
 
-              {/* FIXED BUTTON */}
               <button
-                onClick={() => joinRoom(room.id)}
-                className="bg-blue-600 text-white px-3 py-1 rounded-lg"
+                onClick={() => joinRoom(room)}
+                className={`px-4 py-2 rounded-lg text-white ${
+                  room.active ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"
+                }`}
               >
-                Start Video Session
+                Start Session
               </button>
             </div>
           ))

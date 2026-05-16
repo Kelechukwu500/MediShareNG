@@ -38,7 +38,6 @@ exports.analyzeSymptoms = onCall(
         throw new HttpsError("invalid-argument", "Symptoms are required");
       }
 
-      // Lazy load OpenAI (Heavy library)
       const OpenAI = require("openai");
       const openai = new OpenAI({
         apiKey: OPENAI_API_KEY.value(),
@@ -147,7 +146,7 @@ exports.notifyAdminNewUser = onDocumentCreated(
 );
 
 /* =========================
-   APPOINTMENT NOTIFICATION
+   APPOINTMENT NOTIFICATION (FIXED)
 ========================= */
 exports.notifyAppointmentBooked = onDocumentCreated(
   "appointments/{appointmentId}",
@@ -158,9 +157,11 @@ exports.notifyAppointmentBooked = onDocumentCreated(
       .firestore()
       .collection("notifications")
       .add({
-        title: "New Appointment",
-        message: `${data.patientName || "A patient"} booked an appointment.`,
+        title: "New Appointment Request",
+        message: `${data.patientName || "A patient"} requested consultation.`,
         type: "appointment",
+        status: data.status || "pending",
+        doctorId: data.doctorId,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         time: new Date().toLocaleString(),
       });
@@ -168,7 +169,9 @@ exports.notifyAppointmentBooked = onDocumentCreated(
 );
 
 /* =========================
-   VIDEO ROOM CREATION
+   VIDEO ROOM CREATION (SAFE VERSION)
+   ✅ ONLY CREATES ROOM ON APPOINTMENT
+   ❌ DOES NOT OVERWRITE FRONTEND FLOW
 ========================= */
 exports.createVideoRoomOnAppointment = onDocumentCreated(
   "appointments/{appointmentId}",
@@ -178,6 +181,9 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
 
     if (!data.doctorId || !data.patientId) return;
 
+    // Prevent duplicate room creation
+    if (data.roomId) return;
+
     const roomRef = admin.firestore().collection("videoRooms").doc();
 
     await roomRef.set({
@@ -185,6 +191,7 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
       appointmentId,
       doctorId: data.doctorId,
       patientId: data.patientId,
+      active: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
@@ -199,7 +206,7 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
 );
 
 /* =========================
-   VIDEO NOTIFICATION
+   VIDEO ROOM NOTIFICATION
 ========================= */
 exports.notifyVideoRoomCreated = onDocumentCreated(
   "videoRooms/{roomId}",
@@ -211,7 +218,7 @@ exports.notifyVideoRoomCreated = onDocumentCreated(
       .collection("notifications")
       .add({
         title: "Video Consultation Ready",
-        message: `Room ${roomId} is ready`,
+        message: `Room ${roomId} created`,
         type: "video",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         time: new Date().toLocaleString(),
@@ -246,7 +253,6 @@ exports.exportPartnersExcel = onCall(async (request) => {
     throw new HttpsError("unauthenticated", "Login required");
   }
 
-  // Lazy load XLSX
   const XLSX = require("xlsx");
 
   const snapshot = await admin.firestore().collection("partnerRequests").get();
@@ -287,7 +293,6 @@ exports.exportPartnersPDF = onCall(async (request) => {
     throw new HttpsError("unauthenticated", "Login required");
   }
 
-  // Lazy load heavy libraries
   const PDFDocument = require("pdfkit");
   const fs = require("fs");
 

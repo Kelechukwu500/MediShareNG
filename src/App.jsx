@@ -1,5 +1,6 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
+
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
@@ -10,7 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
 import Contact from "./pages/Contact";
 
-// Other Pages
+// OTHER PAGES
 import AISymptomsChecker from "./OtherPages/AISymptomsChecker";
 import ConnectedDiagnostics from "./OtherPages/ConnectedDiagnostics";
 // import WellnessCoaching from "./OtherPages/WellnessCoaching";
@@ -20,7 +21,7 @@ import CertifiedSpecialists from "./OtherPages/CertifiedSpecialists";
 import BecomeAPartner from "./OtherPages/BecomeAPartner";
 import ViewSpecialists from "./OtherPages/ViewSpecialists";
 
-// Footer Pages
+// FOOTER PAGES
 import OnlineConsultation from "./FooterPages/OnlineConsultation";
 import ConsultationFlow from "./FooterPages/ConsultationFlow";
 import LaboratoryTests from "./FooterPages/LaboratoryTests";
@@ -34,7 +35,7 @@ import Cookies from "./FooterPages/Cookies";
 import MeetOurBoard from "./FooterPages/MeetOurBoard";
 import Blog from "./FooterPages/Blog";
 
-// Consult Pages
+// CONSULT PAGES
 import Signup from "./ConsultPages/Signup";
 import Login from "./ConsultPages/Login";
 import DoctorsPage from "./ConsultPages/DoctorsPage";
@@ -43,14 +44,15 @@ import ProtectedRoute from "./ConsultPages/ProtectedRoute";
 import VideoCall from "./ConsultPages/VideoCall";
 import BookConsultation from "./ConsultPages/BookConsultation";
 
-// Routes
+// ROUTES
 import AdminRoute from "./routes/AdminRoute";
 import PartnerRoute from "./routes/PartnerRoute";
 
+// FIREBASE
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth } from "./firebase";
 
-// Principles
+// PRINCIPLES
 import Accessibility from "./Principles/Accessibility";
 import Transparency from "./Principles/Transparency";
 import Efficiency from "./Principles/Efficiency";
@@ -58,7 +60,7 @@ import Innovation from "./Principles/Innovation";
 import Trust from "./Principles/Trust";
 import PatientCentered from "./Principles/PatientCentered";
 
-// Blog Details
+// BLOG DETAILS
 import NutritionDetails from "./BlogDetails/NutritionDetails";
 import HealthcareDetails from "./BlogDetails/HealthcareDetails";
 import SurgeryDetails from "./BlogDetails/SurgeryDetails";
@@ -69,80 +71,57 @@ import WellnessDetails from "./BlogDetails/WellnessDetails";
 const App = () => {
   const [user, loading] = useAuthState(auth);
 
+  // LOADING SCREEN
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        Loading...
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#2bb673] border-t-transparent rounded-full animate-spin mx-auto"></div>
+
+          <h2 className="mt-6 text-2xl font-bold text-[#065f46]">
+            Loading MediShareNG...
+          </h2>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="overflow-hidden">
       <Navbar />
 
       <Routes>
+        {/* ========================= */}
+        {/* PUBLIC PAGES */}
+        {/* ========================= */}
+
         <Route path="/" element={<Home />} />
         <Route path="/history" element={<History />} />
         <Route path="/services" element={<Services />} />
         <Route path="/contact" element={<Contact />} />
 
-        {/* Protected Routes */}
-        <Route
-          path="/admin-dashboard"
-          element={
-            <AdminRoute user={user}>
-              <Dashboard />
-            </AdminRoute>
-          }
-        />
+        {/* ========================= */}
+        {/* AUTH FLOW */}
+        {/* ========================= */}
 
-        <Route
-          path="/become-a-partner"
-          element={
-            <PartnerRoute user={user}>
-              {" "}
-              {/* ← Pass user here */}
-              <BecomeAPartner />
-            </PartnerRoute>
-          }
-        />
-        <Route path="/view-specialists" element={<ViewSpecialists />} />
-
-        {/* Other Pages */}
-        <Route path="/ai-symptoms-checker" element={<AISymptomsChecker />} />
-        <Route
-          path="/connected-diagnostics"
-          element={<ConnectedDiagnostics />}
-        />
-        {/* <Route path="/wellness-coaching" element={<WellnessCoaching />} /> */}
-        <Route path="/smart-health-records" element={<SmartHealthRecords />} />
-        <Route path="/digital-pharmacy" element={<DigitalPharmacy />} />
-        <Route
-          path="/certified-specialists"
-          element={<CertifiedSpecialists />}
-        />
-
-        {/* Footer Pages */}
-        <Route path="/online-consultation" element={<OnlineConsultation />} />
-        <Route path="/consultation-flow" element={<ConsultationFlow />} />
-        <Route path="/laboratory-tests" element={<LaboratoryTests />} />
-        <Route path="/lab-finder" element={<LabFinder />} />
-        <Route path="/pricing-plans" element={<PricingPlans />} />
-        <Route path="/health-tips" element={<HealthTips />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/faq" element={<FAQ />} />
-        <Route path="/cookies" element={<Cookies />} />
-        <Route path="/meet-our-board" element={<MeetOurBoard />} />
-
-        {/* Consult Pages */}
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/doctors-page" element={<DoctorsPage />} />
-        <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
-        <Route path="/videocall/:roomId" element={<VideoCall />} />
 
+        {/* ========================= */}
+        {/* CONSULTATION FLOW */}
+        {/* ========================= */}
+
+        {/* CHOOSE DOCTOR */}
+        <Route
+          path="/doctors-page"
+          element={
+            <ProtectedRoute>
+              <DoctorsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* BOOK CONSULTATION */}
         <Route
           path="/book-consultation/:id"
           element={
@@ -152,23 +131,146 @@ const App = () => {
           }
         />
 
+        {/* DOCTOR DASHBOARD */}
+        <Route
+          path="/doctor-dashboard"
+          element={
+            <ProtectedRoute>
+              <DoctorDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* VIDEO CALL */}
+        <Route
+          path="/videocall/:roomId"
+          element={
+            <ProtectedRoute>
+              <VideoCall />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* ========================= */}
+        {/* ADMIN ROUTES */}
+        {/* ========================= */}
+
+        <Route
+          path="/admin-dashboard"
+          element={
+            <AdminRoute user={user}>
+              <Dashboard />
+            </AdminRoute>
+          }
+        />
+
+        {/* ========================= */}
+        {/* PARTNER ROUTE */}
+        {/* ========================= */}
+
+        <Route
+          path="/become-a-partner"
+          element={
+            <PartnerRoute user={user}>
+              <BecomeAPartner />
+            </PartnerRoute>
+          }
+        />
+
+        {/* ========================= */}
+        {/* OTHER PAGES */}
+        {/* ========================= */}
+
+        <Route path="/view-specialists" element={<ViewSpecialists />} />
+
+        <Route path="/ai-symptoms-checker" element={<AISymptomsChecker />} />
+
+        <Route
+          path="/connected-diagnostics"
+          element={<ConnectedDiagnostics />}
+        />
+
+        {/* <Route
+          path="/wellness-coaching"
+          element={<WellnessCoaching />}
+        /> */}
+
+        <Route path="/smart-health-records" element={<SmartHealthRecords />} />
+
+        <Route path="/digital-pharmacy" element={<DigitalPharmacy />} />
+
+        <Route
+          path="/certified-specialists"
+          element={<CertifiedSpecialists />}
+        />
+
+        {/* ========================= */}
+        {/* FOOTER PAGES */}
+        {/* ========================= */}
+
+        <Route path="/online-consultation" element={<OnlineConsultation />} />
+
+        <Route path="/consultation-flow" element={<ConsultationFlow />} />
+
+        <Route path="/laboratory-tests" element={<LaboratoryTests />} />
+
+        <Route path="/lab-finder" element={<LabFinder />} />
+
+        <Route path="/pricing-plans" element={<PricingPlans />} />
+
+        <Route path="/health-tips" element={<HealthTips />} />
+
+        <Route path="/privacy" element={<Privacy />} />
+
+        <Route path="/terms" element={<Terms />} />
+
+        <Route path="/faq" element={<FAQ />} />
+
+        <Route path="/cookies" element={<Cookies />} />
+
+        <Route path="/meet-our-board" element={<MeetOurBoard />} />
+
+        {/* ========================= */}
+        {/* BLOG */}
+        {/* ========================= */}
+
         <Route path="/blog" element={<Blog />} />
 
-        {/* Principles */}
+        {/* BLOG DETAILS */}
+
+        <Route path="/blog/technology" element={<TechnologyDetails />} />
+
+        <Route path="/blog/wellness" element={<WellnessDetails />} />
+
+        <Route path="/blog/nutrition" element={<NutritionDetails />} />
+
+        <Route path="/blog/healthcare" element={<HealthcareDetails />} />
+
+        <Route path="/blog/surgery" element={<SurgeryDetails />} />
+
+        <Route path="/blog/gadgets" element={<GadgetsDetails />} />
+
+        {/* ========================= */}
+        {/* PRINCIPLES */}
+        {/* ========================= */}
+
         <Route path="/values/accessibility" element={<Accessibility />} />
+
         <Route path="/values/transparency" element={<Transparency />} />
+
         <Route path="/values/efficiency" element={<Efficiency />} />
+
         <Route path="/values/innovation" element={<Innovation />} />
+
         <Route path="/values/trust" element={<Trust />} />
+
         <Route path="/values/patient-centered" element={<PatientCentered />} />
 
-        {/* Blog Details */}
-        <Route path="/blog/technology" element={<TechnologyDetails />} />
-        <Route path="/blog/wellness" element={<WellnessDetails />} />
-        <Route path="/blog/nutrition" element={<NutritionDetails />} />
-        <Route path="/blog/healthcare" element={<HealthcareDetails />} />
-        <Route path="/blog/surgery" element={<SurgeryDetails />} />
-        <Route path="/blog/gadgets" element={<GadgetsDetails />} />
+        {/* ========================= */}
+        {/* FALLBACK ROUTE */}
+        {/* ========================= */}
+
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
       <Footer />

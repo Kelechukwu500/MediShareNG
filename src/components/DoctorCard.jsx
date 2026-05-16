@@ -13,8 +13,12 @@ const DoctorCard = ({ doctor }) => {
       return navigate("/login");
     }
 
+    if (!doctor?.id) {
+      alert("Doctor not found");
+      return;
+    }
+
     try {
-      // Create appointment ONLY
       await addDoc(collection(db, "appointments"), {
         patientId: user.uid,
         doctorId: doctor.id,
@@ -24,10 +28,10 @@ const DoctorCard = ({ doctor }) => {
         createdAt: serverTimestamp(),
       });
 
-      // ❌ DO NOT navigate to videocall here
       alert("Appointment booked successfully. Waiting for doctor approval.");
     } catch (error) {
-      console.error("Error booking doctor:", error);
+      console.error(error);
+      alert("Booking failed");
     }
   };
 
