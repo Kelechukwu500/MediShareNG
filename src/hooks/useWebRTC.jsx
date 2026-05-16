@@ -1,25 +1,25 @@
 import { useEffect, useRef } from "react";
 import {
   doc,
-  setDoc,
-  getDoc,
   updateDoc,
   onSnapshot,
   arrayUnion,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
 const useWebRTC = (roomId, userId, isCaller) => {
   const localStream = useRef(null);
-  const remoteStream = useRef(null);
+  const remoteStream = useRef(new MediaStream());
   const peerConnection = useRef(null);
+  const unsubscribeRef = useRef(null);
 
   const servers = {
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
   };
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !userId) return;
 
     start();
 
@@ -27,92 +27,96 @@ const useWebRTC = (roomId, userId, isCaller) => {
       if (peerConnection.current) {
         peerConnection.current.close();
       }
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
     };
-  }, [roomId]);
+  }, [roomId, userId]);
 
   const start = async () => {
     try {
-      // ✅ GET USER MEDIA (CAMERA + MIC)
+      // ===========================
+      // GET USER MEDIA
+      // ===========================
       localStream.current = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true,
       });
 
-      // ✅ CREATE PEER CONNECTION
+      // ===========================
+      // CREATE PEER CONNECTION
+      // ===========================
       peerConnection.current = new RTCPeerConnection(servers);
 
-      // Add tracks to peer connection
+      // Add local tracks
       localStream.current.getTracks().forEach((track) => {
         peerConnection.current.addTrack(track, localStream.current);
       });
 
-      // Remote stream setup
-      const remote = new MediaStream();
-      remoteStream.current = remote;
-
+      // Remote stream handling
       peerConnection.current.ontrack = (event) => {
         event.streams[0].getTracks().forEach((track) => {
-          remote.addTrack(track);
+          remoteStream.current.addTrack(track);
         });
       };
 
-      // ===============================
-      // ICE CANDIDATES HANDLING
-      // ===============================
+      const roomRef = doc(db, "videoRooms", roomId);
+
+      // ===========================
+      // ICE CANDIDATES (SEND)
+      // ===========================
       peerConnection.current.onicecandidate = async (event) => {
         if (!event.candidate) return;
 
-        const roomRef = doc(db, "videoRooms", roomId);
+        const candidate = event.candidate.toJSON();
 
-        if (isCaller) {
-          await updateDoc(roomRef, {
-            offerCandidates: arrayUnion(event.candidate.toJSON()),
-          });
-        } else {
-          await updateDoc(roomRef, {
-            answerCandidates: arrayUnion(event.candidate.toJSON()),
-          });
-        }
+        await updateDoc(roomRef, {
+          [isCaller ? "offerCandidates" : "answerCandidates"]:
+            arrayUnion(candidate),
+        });
       };
 
-      const roomRef = doc(db, "videoRooms", roomId);
+      // ===========================
+      // GET ROOM DATA
+      // ===========================
       const roomSnap = await getDoc(roomRef);
       const roomData = roomSnap.data();
 
-      // ===============================
+      if (!roomData) return;
+
+      // ===========================
       // CALLER CREATES OFFER
-      // ===============================
+      // ===========================
       if (isCaller && !roomData.offer) {
         const offer = await peerConnection.current.createOffer();
         await peerConnection.current.setLocalDescription(offer);
 
-        await setDoc(roomRef, {
+        await updateDoc(roomRef, {
           offer: {
-            sdp: offer.sdp,
             type: offer.type,
+            sdp: offer.sdp,
           },
-          offerCandidates: [],
-          answerCandidates: [],
-          createdAt: new Date(),
         });
       }
 
-      // ===============================
-      // LISTENER (DOCTOR)
-      // ===============================
-      onSnapshot(roomRef, async (snap) => {
+      // ===========================
+      // LISTEN FOR CHANGES
+      // ===========================
+      unsubscribeRef.current = onSnapshot(roomRef, async (snap) => {
         const data = snap.data();
-
         if (!data) return;
 
-        // Accept offer
+        // ===========================
+        // HANDLE OFFER (PATIENT)
+        // ===========================
         if (
           data.offer &&
           !isCaller &&
           !peerConnection.current.currentRemoteDescription
         ) {
-          const offerDesc = new RTCSessionDescription(data.offer);
-          await peerConnection.current.setRemoteDescription(offerDesc);
+          await peerConnection.current.setRemoteDescription(
+            new RTCSessionDescription(data.offer),
+          );
 
           const answer = await peerConnection.current.createAnswer();
           await peerConnection.current.setLocalDescription(answer);
@@ -125,10 +129,32 @@ const useWebRTC = (roomId, userId, isCaller) => {
           });
         }
 
-        // Caller receives answer
+        // ===========================
+        // HANDLE ANSWER (DOCTOR)
+        // ===========================
         if (data.answer && isCaller) {
-          const answerDesc = new RTCSessionDescription(data.answer);
-          await peerConnection.current.setRemoteDescription(answerDesc);
+          await peerConnection.current.setRemoteDescription(
+            new RTCSessionDescription(data.answer),
+          );
+        }
+
+        // ===========================
+        // HANDLE ICE CANDIDATES (REMOTE → LOCAL)
+        // ===========================
+        const candidateList = isCaller
+          ? data.answerCandidates
+          : data.offerCandidates;
+
+        if (candidateList && peerConnection.current) {
+          candidateList.forEach(async (candidate) => {
+            try {
+              await peerConnection.current.addIceCandidate(
+                new RTCIceCandidate(candidate),
+              );
+            } catch (err) {
+              console.warn("ICE error:", err);
+            }
+          });
         }
       });
     } catch (error) {

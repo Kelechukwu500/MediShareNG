@@ -1,69 +1,50 @@
 import React from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
+import { Stethoscope, Star, ArrowRight } from "lucide-react";
 
 const DoctorCard = ({ doctor }) => {
   const navigate = useNavigate();
 
-  const bookDoctor = async () => {
-    const user = auth.currentUser;
-
-    if (!user) {
-      return navigate("/login");
-    }
-
-    if (!doctor?.id) {
-      alert("Doctor not found");
-      return;
-    }
-
-    try {
-      await addDoc(collection(db, "appointments"), {
-        patientId: user.uid,
-        doctorId: doctor.id,
-        patientName: user.email,
-        doctorName: doctor.name,
-        status: "pending",
-        createdAt: serverTimestamp(),
-      });
-
-      alert("Appointment booked successfully. Waiting for doctor approval.");
-    } catch (error) {
-      console.error(error);
-      alert("Booking failed");
-    }
+  const handleSelect = () => {
+    navigate(`/book-consultation/${doctor.id}`, {
+      state: { doctor },
+    });
   };
 
   return (
-    <div className="bg-white shadow-md rounded-xl p-5 border hover:shadow-lg transition">
-      <h2 className="text-lg font-bold text-green-700">{doctor.name}</h2>
+    <div className="bg-white rounded-2xl shadow-md p-6 hover:shadow-xl transition border">
+      {/* ICON */}
+      <div className="w-14 h-14 bg-green-100 text-green-700 rounded-xl flex items-center justify-center">
+        <Stethoscope />
+      </div>
 
-      <p className="text-gray-600 mt-1">{doctor.specialty}</p>
+      {/* NAME */}
+      <h2 className="mt-4 text-xl font-bold text-gray-800">{doctor.name}</h2>
 
-      <p className="text-sm text-gray-500 mt-1">
-        Experience: {doctor.experience}
+      {/* SPECIALTY */}
+      <p className="text-gray-600">{doctor.specialty}</p>
+
+      {/* EXPERIENCE */}
+      <p className="text-sm text-gray-500 mt-2">
+        Experience: {doctor.experience} years
       </p>
 
-      {/* Availability */}
-      <div className="mt-3">
-        {doctor.available ? (
-          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold">
-            Available
-          </span>
+      {/* ONLINE STATUS */}
+      <div className="mt-2 text-sm">
+        {doctor.isOnline ? (
+          <span className="text-green-600 font-semibold">● Online</span>
         ) : (
-          <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-semibold">
-            Unavailable
-          </span>
+          <span className="text-gray-400">● Offline</span>
         )}
       </div>
 
-      {/* 👇 BUTTON CONNECTED HERE */}
+      {/* BUTTON */}
       <button
-        onClick={bookDoctor}
-        className="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+        onClick={handleSelect}
+        className="mt-6 w-full bg-green-700 hover:bg-green-800 text-white py-3 rounded-xl flex items-center justify-center gap-2"
       >
-        Book Consultation
+        Select Doctor
+        <ArrowRight size={18} />
       </button>
     </div>
   );

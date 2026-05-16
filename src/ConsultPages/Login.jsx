@@ -18,6 +18,7 @@ import {
 
 const Login = () => {
   const navigate = useNavigate();
+
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
@@ -25,6 +26,9 @@ const Login = () => {
     password: "",
   });
 
+  /* =========================
+     HANDLE INPUT CHANGE
+  ========================== */
   const handleChange = (e) => {
     setForm({
       ...form,
@@ -32,13 +36,18 @@ const Login = () => {
     });
   };
 
+  /* =========================
+     HANDLE LOGIN
+  ========================== */
   const handleLogin = async (e) => {
     e.preventDefault();
 
     setLoading(true);
 
     try {
-      // LOGIN USER
+      /* =========================
+         FIREBASE AUTH LOGIN
+      ========================== */
       const userCred = await signInWithEmailAndPassword(
         auth,
         form.email,
@@ -47,62 +56,90 @@ const Login = () => {
 
       const user = userCred.user;
 
-      // FORCE REFRESH
-      await user.reload();
+      console.log("AUTH UID:", user.uid);
 
-      // EMAIL VERIFICATION CHECK
+      /* =========================
+         EMAIL VERIFICATION CHECK
+      ========================== */
       if (!user.emailVerified) {
-        await sendEmailVerification(user);
-        alert("Email not verified. A new verification email has been sent.");
+        alert("Please verify your email before logging in.");
+
         setLoading(false);
+
         return;
       }
 
-      // GET USER DATA
+      /* =========================
+         GET USER PROFILE
+      ========================== */
       const userRef = doc(db, "users", user.uid);
+
       const snap = await getDoc(userRef);
 
+      console.log("FIRESTORE PROFILE EXISTS:", snap.exists());
+
       if (!snap.exists()) {
-        alert("User data not found.");
+        alert(
+          `User profile not found.\n\nCreate this document in Firestore:\nusers/${user.uid}`,
+        );
+
         setLoading(false);
+
         return;
       }
 
       const userData = snap.data();
 
-      // MARK VERIFIED (SAFE UPDATE)
+      console.log("USER ROLE:", userData.role);
+
+      /* =========================
+         OPTIONAL VERIFIED FLAG
+      ========================== */
       await updateDoc(userRef, {
         verified: true,
       });
 
-      // STORE SESSION
-      localStorage.setItem("userRole", userData.role);
+      /* =========================
+         SAVE USER SESSION
+      ========================== */
       localStorage.setItem("userId", user.uid);
-      localStorage.setItem("userName", userData.fullName || "");
 
-      // ROLE ROUTING
-      setTimeout(() => {
-        if (userData.role === "admin") {
-          navigate("/admin-dashboard");
-        } else if (userData.role === "doctor") {
-          navigate("/doctor-dashboard");
-        } else {
-          navigate("/doctors-page");
-        }
-      }, 200);
-    } catch (error) {
-      console.error(error);
+      localStorage.setItem("userRole", userData.role);
 
-      if (error.code === "auth/user-not-found") {
-        alert("No user found.");
-      } else if (error.code === "auth/wrong-password") {
-        alert("Incorrect password.");
-      } else if (error.code === "auth/invalid-email") {
-        alert("Invalid email.");
-      } else if (error.code === "auth/invalid-credential") {
-        alert("Invalid login credentials.");
+      /* =========================
+         ROLE-BASED REDIRECT
+      ========================== */
+      if (userData.role === "admin") {
+        navigate("/admin-dashboard");
+      } else if (userData.role === "doctor") {
+        navigate("/doctor-dashboard");
+      } else if (userData.role === "patient") {
+        navigate("/patient-dashboard");
       } else {
-        alert(error.message);
+        navigate("/");
+      }
+    } catch (error) {
+      console.error("LOGIN ERROR:", error);
+
+      switch (error.code) {
+        case "auth/user-not-found":
+          alert("No user found.");
+          break;
+
+        case "auth/wrong-password":
+          alert("Incorrect password.");
+          break;
+
+        case "auth/invalid-email":
+          alert("Invalid email.");
+          break;
+
+        case "auth/invalid-credential":
+          alert("Invalid login credentials.");
+          break;
+
+        default:
+          alert(error.message);
       }
     } finally {
       setLoading(false);
@@ -112,14 +149,18 @@ const Login = () => {
   return (
     <section className="min-h-screen bg-gradient-to-br from-[#ecfdf5] via-white to-[#d1fae5] flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 overflow-hidden rounded-[2.5rem] shadow-2xl bg-white">
-        {/* LEFT SIDE */}
+        {/* =========================
+            LEFT SIDE
+        ========================== */}
         <div className="hidden lg:flex relative bg-gradient-to-br from-[#065f46] via-[#047857] to-[#2bb673] p-14 text-white flex-col justify-between overflow-hidden">
           <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
+
           <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
 
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 px-5 py-2 rounded-full">
               <ShieldCheck size={18} />
+
               <span className="text-sm font-semibold uppercase">
                 Secure Login
               </span>
@@ -137,26 +178,32 @@ const Login = () => {
             <div className="mt-10 space-y-5">
               <div className="flex items-center gap-4">
                 <MailCheck size={22} />
+
                 <span>Verified Email Login</span>
               </div>
 
               <div className="flex items-center gap-4">
                 <LockKeyhole size={22} />
+
                 <span>Secure Access</span>
               </div>
 
               <div className="flex items-center gap-4">
                 <LogIn size={22} />
+
                 <span>Continue Flow</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* RIGHT SIDE */}
+        {/* =========================
+            RIGHT SIDE
+        ========================== */}
         <div className="flex items-center justify-center p-6 sm:p-10 lg:p-14">
           <form onSubmit={handleLogin} className="w-full max-w-md">
             <h2 className="text-4xl font-black text-[#065f46]">Login</h2>
+
             <p className="mt-2 text-gray-600">Access your dashboard</p>
 
             {/* EMAIL */}
@@ -166,6 +213,7 @@ const Login = () => {
               value={form.email}
               onChange={handleChange}
               placeholder="Email"
+              required
               className="mt-8 w-full h-14 px-4 rounded-2xl border outline-none focus:ring-2 focus:ring-[#2bb673]"
             />
 
@@ -176,16 +224,18 @@ const Login = () => {
               value={form.password}
               onChange={handleChange}
               placeholder="Password"
+              required
               className="mt-5 w-full h-14 px-4 rounded-2xl border outline-none focus:ring-2 focus:ring-[#2bb673]"
             />
 
-            {/* BUTTON */}
+            {/* LOGIN BUTTON */}
             <button
               type="submit"
               disabled={loading}
               className="mt-8 w-full h-14 rounded-2xl bg-gradient-to-r from-[#065f46] to-[#2bb673] text-white font-bold flex items-center justify-center gap-3"
             >
               {loading ? "Logging in..." : "Login"}
+
               {!loading && <ArrowRight size={20} />}
             </button>
 

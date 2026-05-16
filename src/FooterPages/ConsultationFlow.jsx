@@ -1,6 +1,5 @@
 import React from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { auth } from "../firebase";
 import {
   BadgeCheck,
   UserPlus,
@@ -21,46 +20,25 @@ const ConsultationFlow = () => {
     {
       number: "01",
       icon: <UserPlus size={34} />,
-      title: "Create Account",
-      text: "Create your MediShareNG account securely and verify your email address instantly.",
+      title: "Choose Doctor",
+      text: "Select a certified doctor or specialist that fits your health needs.",
     },
     {
       number: "02",
       icon: <Stethoscope size={34} />,
-      title: "Choose Doctor",
-      text: "Find and select certified doctors and specialists based on your healthcare needs.",
+      title: "Book Consultation",
+      text: "Schedule your consultation instantly with your preferred doctor.",
     },
     {
       number: "03",
-      icon: <CalendarDays size={34} />,
-      title: "Book Consultation",
-      text: "Schedule an appointment and choose a preferred consultation date and time.",
-    },
-    {
-      number: "04",
       icon: <Video size={34} />,
       title: "Video Session",
-      text: "Join a secure HD video consultation session with your selected healthcare provider.",
+      text: "Join a secure HD video call with your doctor in real time.",
     },
   ];
 
-  // ✅ MAIN FLOW BUTTON
+  // 🚀 PURE FLOW (NO AUTH LOCK)
   const handleStartFlow = () => {
-    const user = auth.currentUser;
-
-    if (!user) {
-      // NOT LOGGED IN
-      navigate("/signup");
-      return;
-    }
-
-    if (!user.emailVerified) {
-      // LOGGED IN BUT NOT VERIFIED
-      navigate("/login");
-      return;
-    }
-
-    // LOGGED IN + VERIFIED
     navigate("/doctors-page");
   };
 
@@ -69,7 +47,6 @@ const ConsultationFlow = () => {
       <div className="max-w-7xl mx-auto">
         {/* HERO SECTION */}
         <div className="relative overflow-hidden rounded-[3rem] bg-gradient-to-r from-[#065f46] via-[#0f766e] to-[#2bb673] p-10 sm:p-14 lg:p-20 text-white shadow-2xl">
-          {/* BLUR EFFECTS */}
           <div className="absolute top-0 right-0 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
           <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl"></div>
 
@@ -79,7 +56,7 @@ const ConsultationFlow = () => {
               <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 px-5 py-2 rounded-full backdrop-blur-md">
                 <BadgeCheck size={18} />
                 <span className="text-sm font-semibold uppercase tracking-wider">
-                  Digital Healthcare Consultation
+                  Digital Consultation Flow
                 </span>
               </div>
 
@@ -91,35 +68,11 @@ const ConsultationFlow = () => {
               </h1>
 
               <p className="mt-6 text-lg text-white/90 leading-relaxed max-w-2xl">
-                MediShareNG gives patients secure access to certified doctors,
-                specialists, online consultations, prescriptions, and HD video
-                sessions from anywhere.
+                Connect instantly with certified doctors, book appointments, and
+                start secure video consultations without barriers.
               </p>
 
-              {/* FLOW FEATURES */}
-              <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="text-[#d1fae5]" size={22} />
-                  <span>Email Verification</span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="text-[#d1fae5]" size={22} />
-                  <span>Choose Specialists</span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="text-[#d1fae5]" size={22} />
-                  <span>Book Appointment</span>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="text-[#d1fae5]" size={22} />
-                  <span>Secure Video Session</span>
-                </div>
-              </div>
-
-              {/* MAIN CTA BUTTON */}
+              {/* CTA */}
               <div className="flex flex-col sm:flex-row gap-5 mt-12">
                 <button
                   onClick={handleStartFlow}
@@ -140,7 +93,7 @@ const ConsultationFlow = () => {
               </div>
             </div>
 
-            {/* RIGHT SIDE CARDS */}
+            {/* RIGHT STEPS */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {consultationSteps.map((step, index) => (
                 <div
@@ -169,38 +122,28 @@ const ConsultationFlow = () => {
         </div>
 
         {/* BOTTOM STATS */}
-        <div className="mt-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-100">
-            <Clock3 size={38} className="text-[#2bb673]" />
-            <h2 className="mt-5 text-3xl font-black text-[#065f46]">24/7</h2>
-            <p className="mt-3 text-gray-600">
-              Access healthcare support anytime.
-            </p>
-          </div>
-
-          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-100">
+        <div className="mt-20 grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <div className="bg-white rounded-[2rem] p-8 shadow-lg">
             <ShieldCheck size={38} className="text-[#2bb673]" />
             <h2 className="mt-5 text-3xl font-black text-[#065f46]">Secure</h2>
             <p className="mt-3 text-gray-600">
-              Protected consultations and patient data.
+              Safe and encrypted consultations.
             </p>
           </div>
 
-          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-100">
+          <div className="bg-white rounded-[2rem] p-8 shadow-lg">
             <HeartPulse size={38} className="text-[#2bb673]" />
             <h2 className="mt-5 text-3xl font-black text-[#065f46]">Experts</h2>
             <p className="mt-3 text-gray-600">
-              Consult experienced healthcare specialists.
+              Certified doctors available anytime.
             </p>
           </div>
 
-          <div className="bg-white rounded-[2rem] p-8 shadow-lg border border-gray-100">
+          <div className="bg-white rounded-[2rem] p-8 shadow-lg">
             <Video size={38} className="text-[#2bb673]" />
-            <h2 className="mt-5 text-3xl font-black text-[#065f46]">
-              HD Calls
-            </h2>
+            <h2 className="mt-5 text-3xl font-black text-[#065f46]">Video</h2>
             <p className="mt-3 text-gray-600">
-              Crystal-clear video consultation sessions.
+              HD consultation with real doctors.
             </p>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { db, auth } from "../firebase";
 import { useAuthState } from "react-firebase-hooks/auth";
 import {
@@ -10,16 +10,17 @@ import {
   doc,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import toast, { Toaster } from "react-hot-toast";
 
 const DoctorDashboard = () => {
   const [appointments, setAppointments] = useState([]);
-  const [videoRooms, setVideoRooms] = useState([]);
+  const [previousCount, setPreviousCount] = useState(0);
 
   const navigate = useNavigate();
   const [doctor, loading] = useAuthState(auth);
 
   /* =========================
-     LOADING / AUTH GUARD
+     AUTH GUARD
   ========================== */
   if (loading) {
     return (
@@ -38,7 +39,7 @@ const DoctorDashboard = () => {
   }
 
   /* =========================
-     GET DOCTOR APPOINTMENTS
+     REAL-TIME APPOINTMENTS
   ========================== */
   useEffect(() => {
     if (!doctor?.uid) return;
@@ -49,75 +50,76 @@ const DoctorDashboard = () => {
     );
 
     const unsub = onSnapshot(q, (snap) => {
-      setAppointments(
-        snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        })),
-      );
+      const data = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      // 🔥 realtime notification for new appointment
+      if (data.length > previousCount) {
+        toast.success("New consultation request received!");
+      }
+
+      setPreviousCount(data.length);
+      setAppointments(data);
     });
 
     return () => unsub();
-  }, [doctor]);
+  }, [doctor, previousCount]);
 
   /* =========================
-     GET VIDEO ROOMS
+     APPROVE APPOINTMENT
   ========================== */
-  useEffect(() => {
-    if (!doctor?.uid) return;
-
-    const q = query(
-      collection(db, "videoRooms"),
-      where("doctorId", "==", doctor.uid),
-    );
-
-    const unsub = onSnapshot(q, (snap) => {
-      setVideoRooms(
-        snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        })),
-      );
-    });
-
-    return () => unsub();
-  }, [doctor]);
-
-  /* =========================
-     ACCEPT APPOINTMENT
-  ========================== */
-  const acceptAppointment = async (appointment) => {
+  const approveAppointment = async (id) => {
     try {
-      await updateDoc(doc(db, "appointments", appointment.id), {
-        status: "accepted",
+      await updateDoc(doc(db, "appointments", id), {
+        status: "approved",
       });
 
-      // Activate room if exists
-      if (appointment.roomId) {
-        await updateDoc(doc(db, "videoRooms", appointment.roomId), {
-          active: true,
-        });
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Failed to accept appointment");
+      toast.success("Appointment approved");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to approve");
     }
   };
 
   /* =========================
-     START VIDEO CALL
+     REJECT APPOINTMENT
   ========================== */
-  const joinRoom = (room) => {
-    if (!room?.active) {
-      alert("This consultation is not active yet. Accept appointment first.");
+  const rejectAppointment = async (id) => {
+    try {
+      await updateDoc(doc(db, "appointments", id), {
+        status: "rejected",
+      });
+
+      toast.error("Appointment rejected");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to reject");
+    }
+  };
+
+  /* =========================
+     JOIN VIDEO SESSION
+  ========================== */
+  const joinRoom = (appointment) => {
+    if (appointment.status !== "approved") {
+      toast.error("You must approve before joining session");
       return;
     }
 
-    navigate(`/videocall/${room.id}`);
+    if (!appointment.videoRoomId) {
+      toast.error("No video room found");
+      return;
+    }
+
+    navigate(`/videocall/${appointment.videoRoomId}`);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
+      <Toaster />
+
       <h1 className="text-3xl font-bold text-green-700 mb-6">
         Doctor Dashboard
       </h1>
@@ -125,7 +127,7 @@ const DoctorDashboard = () => {
       {/* =========================
           APPOINTMENTS
       ========================== */}
-      <div className="bg-white p-5 rounded-xl shadow-md mb-6">
+      <div className="bg-white p-5 rounded-xl shadow-md">
         <h2 className="text-xl font-semibold mb-4">Incoming Appointments</h2>
 
         {appointments.length === 0 ? (
@@ -144,49 +146,34 @@ const DoctorDashboard = () => {
                 <p className="text-sm text-gray-500">Status: {a.status}</p>
               </div>
 
-              {a.status === "pending" && (
-                <button
-                  onClick={() => acceptAppointment(a)}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg"
-                >
-                  Accept
-                </button>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+              <div className="flex gap-2">
+                {a.status === "pending" && (
+                  <>
+                    <button
+                      onClick={() => approveAppointment(a.id)}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg"
+                    >
+                      Approve
+                    </button>
 
-      {/* =========================
-          VIDEO ROOMS
-      ========================== */}
-      <div className="bg-white p-5 rounded-xl shadow-md">
-        <h2 className="text-xl font-semibold mb-4">Video Consultation Rooms</h2>
+                    <button
+                      onClick={() => rejectAppointment(a.id)}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg"
+                    >
+                      Reject
+                    </button>
+                  </>
+                )}
 
-        {videoRooms.length === 0 ? (
-          <p className="text-gray-500">No active rooms</p>
-        ) : (
-          videoRooms.map((room) => (
-            <div
-              key={room.id}
-              className="border p-4 rounded-lg mb-3 flex justify-between items-center"
-            >
-              <div>
-                <p className="font-semibold">Room ID: {room.id}</p>
-
-                <p className="text-sm text-gray-500">
-                  Status: {room.active ? "Active" : "Waiting Approval"}
-                </p>
+                {a.status === "approved" && (
+                  <button
+                    onClick={() => joinRoom(a)}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                  >
+                    Join Session
+                  </button>
+                )}
               </div>
-
-              <button
-                onClick={() => joinRoom(room)}
-                className={`px-4 py-2 rounded-lg text-white ${
-                  room.active ? "bg-blue-600" : "bg-gray-400 cursor-not-allowed"
-                }`}
-              >
-                Start Session
-              </button>
             </div>
           ))
         )}

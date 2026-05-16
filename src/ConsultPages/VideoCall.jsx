@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import useWebRTC from "../hooks/useWebRTC";
 
 const VideoCall = () => {
@@ -14,60 +14,58 @@ const VideoCall = () => {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [roomData, setRoomData] = useState(null);
+  const [waiting, setWaiting] = useState(false);
 
   const user = auth.currentUser;
 
-  const userRole = localStorage.getItem("userRole");
-  const userId = localStorage.getItem("userId");
-
-  const isCaller = userRole === "doctor";
+  const userId = user?.uid;
 
   // ===============================
-  // VALIDATE ROOM ACCESS
+  // VALIDATE ROOM ACCESS + REALTIME ROOM STATE
   // ===============================
   useEffect(() => {
-    const validateRoom = async () => {
-      if (!roomId || !userId) {
-        navigate("/login");
+    if (!roomId || !userId) {
+      navigate("/login");
+      return;
+    }
+
+    const roomRef = doc(db, "videoRooms", roomId);
+
+    const unsub = onSnapshot(roomRef, (snap) => {
+      if (!snap.exists()) {
+        navigate("/doctors-page");
         return;
       }
 
-      try {
-        const roomRef = doc(db, "videoRooms", roomId);
-        const snap = await getDoc(roomRef);
+      const data = snap.data();
+      setRoomData(data);
 
-        if (!snap.exists()) {
-          navigate("/doctors-page");
-          return;
-        }
+      const allowed = data.doctorId === userId || data.patientId === userId;
 
-        const data = snap.data();
-        setRoomData(data);
-
-        // ONLY allow doctor OR patient in room
-        const allowed = data.doctorId === userId || data.patientId === userId;
-
-        if (!allowed) {
-          navigate("/doctors-page");
-          return;
-        }
-
-        // BLOCK if not active yet
-        if (!data.active) {
-          alert("Waiting for doctor to start the session");
-        }
-
-        setAuthorized(true);
-      } catch (error) {
-        console.error(error);
+      if (!allowed) {
         navigate("/doctors-page");
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
 
-    validateRoom();
+      // 🔥 BLOCK UNTIL DOCTOR ACTIVATES SESSION
+      if (!data.active) {
+        setWaiting(true);
+        setAuthorized(false);
+      } else {
+        setWaiting(false);
+        setAuthorized(true);
+      }
+
+      setLoading(false);
+    });
+
+    return () => unsub();
   }, [roomId, userId, navigate]);
+
+  // ===============================
+  // DETERMINE ROLE (SAFE)
+  // ===============================
+  const isCaller = roomData?.doctorId === userId;
 
   // ===============================
   // WEBRTC HOOK
@@ -99,6 +97,23 @@ const VideoCall = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white">
         Loading video session...
+      </div>
+    );
+  }
+
+  // ===============================
+  // WAITING FOR DOCTOR APPROVAL
+  // ===============================
+  if (waiting) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
+        <h2 className="text-2xl font-bold mb-3">
+          Waiting for doctor to start session...
+        </h2>
+
+        <p className="text-gray-400">
+          You will be connected automatically once the doctor approves.
+        </p>
       </div>
     );
   }

@@ -5,28 +5,21 @@ const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 
-const nodemailer = require("nodemailer");
-
 /* =========================
    🔐 OPENAI SECRET
 ========================= */
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 
 /* =========================
-   📧 NODEMAILER
+   🔐 SAFE USER FETCH HELPER
 ========================= */
-function getTransporter() {
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: "YOUR_GMAIL@gmail.com",
-      pass: "YOUR_APP_PASSWORD",
-    },
-  });
+async function getUser(uid) {
+  const snap = await admin.firestore().collection("users").doc(uid).get();
+  return snap.exists ? snap.data() : null;
 }
 
 /* =====================================================
-   🧠 AI SYMPTOM ANALYSIS
+   🧠 AI SYMPTOM ANALYSIS (FIXED - LAZY LOAD OPENAI)
 ===================================================== */
 exports.analyzeSymptoms = onCall(
   { secrets: [OPENAI_API_KEY] },
@@ -38,7 +31,9 @@ exports.analyzeSymptoms = onCall(
         throw new HttpsError("invalid-argument", "Symptoms are required");
       }
 
+      // 🔥 IMPORT INSIDE FUNCTION (CRITICAL FIX)
       const OpenAI = require("openai");
+
       const openai = new OpenAI({
         apiKey: OPENAI_API_KEY.value(),
       });
@@ -48,15 +43,7 @@ exports.analyzeSymptoms = onCall(
         messages: [
           {
             role: "system",
-            content: `
-You are a medical triage AI assistant.
-You are NOT a doctor.
-You must NOT diagnose diseases.
-You only assess risk level.
-
-Always end with:
-Triage Level: LOW | MODERATE | HIGH | CRITICAL
-            `,
+            content: "You are a medical triage assistant. Do not diagnose.",
           },
           {
             role: "user",
@@ -66,36 +53,44 @@ Pain: ${severityData?.pain ?? 0}
 Fatigue: ${severityData?.fatigue ?? 0}
 Fever: ${severityData?.fever ?? 0}
 Breathing: ${severityData?.breathing ?? 0}
-
-Give clinical reasoning and triage.
             `,
           },
         ],
         temperature: 0.5,
       });
 
-      const result = completion?.choices?.[0]?.message?.content;
-
-      return { result };
+      return {
+        result: completion.choices[0].message.content,
+      };
     } catch (error) {
-      console.error(error);
-      throw new HttpsError("internal", error?.message || "Unknown error");
+      throw new HttpsError("internal", error?.message || "AI error");
     }
   },
 );
 
 /* =========================
-   EMAIL NOTIFICATION
+   EMAIL NOTIFICATION (FIXED)
 ========================= */
 exports.sendWelcomeEmail = onDocumentCreated(
   "newsletterSubscribers/{docId}",
   async (event) => {
     const data = event.data.data();
 
-    await getTransporter().sendMail({
+    // 🔥 LAZY LOAD NODEMAILER
+    const nodemailer = require("nodemailer");
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "YOUR_GMAIL@gmail.com",
+        pass: "YOUR_APP_PASSWORD",
+      },
+    });
+
+    await transporter.sendMail({
       from: "MediShareNG <YOUR_GMAIL@gmail.com>",
       to: data.email,
-      subject: "Welcome to MediShareNG Newsletter 🎉",
+      subject: "Welcome to MediShareNG 🎉",
       html: `<h2>Welcome!</h2><p>Thanks for subscribing.</p>`,
     });
   },
@@ -114,10 +109,9 @@ exports.notifyAdminPartnerRequest = onDocumentCreated(
       .collection("notifications")
       .add({
         title: "New Partner Request",
-        message: `${data.organization} sent a partnership request`,
+        message: `${data.organization} sent a request`,
         type: "partner",
         read: false,
-        userId: data.userId || null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         time: new Date().toLocaleString(),
       });
@@ -137,7 +131,7 @@ exports.notifyAdminNewUser = onDocumentCreated(
       .collection("notifications")
       .add({
         title: "New User Registered",
-        message: `${data.name || data.email} joined.`,
+        message: `${data.fullName || data.email} joined`,
         type: "user",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         time: new Date().toLocaleString(),
@@ -146,7 +140,7 @@ exports.notifyAdminNewUser = onDocumentCreated(
 );
 
 /* =========================
-   APPOINTMENT NOTIFICATION (FIXED)
+   APPOINTMENT NOTIFICATION
 ========================= */
 exports.notifyAppointmentBooked = onDocumentCreated(
   "appointments/{appointmentId}",
@@ -158,10 +152,11 @@ exports.notifyAppointmentBooked = onDocumentCreated(
       .collection("notifications")
       .add({
         title: "New Appointment Request",
-        message: `${data.patientName || "A patient"} requested consultation.`,
+        message: `Patient booked consultation`,
         type: "appointment",
-        status: data.status || "pending",
         doctorId: data.doctorId,
+        patientId: data.patientId,
+        status: data.status || "pending",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         time: new Date().toLocaleString(),
       });
@@ -169,9 +164,7 @@ exports.notifyAppointmentBooked = onDocumentCreated(
 );
 
 /* =========================
-   VIDEO ROOM CREATION (SAFE VERSION)
-   ✅ ONLY CREATES ROOM ON APPOINTMENT
-   ❌ DOES NOT OVERWRITE FRONTEND FLOW
+   VIDEO ROOM CREATION (SAFE)
 ========================= */
 exports.createVideoRoomOnAppointment = onDocumentCreated(
   "appointments/{appointmentId}",
@@ -180,8 +173,6 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
     const appointmentId = event.params.appointmentId;
 
     if (!data.doctorId || !data.patientId) return;
-
-    // Prevent duplicate room creation
     if (data.roomId) return;
 
     const roomRef = admin.firestore().collection("videoRooms").doc();
@@ -217,7 +208,7 @@ exports.notifyVideoRoomCreated = onDocumentCreated(
       .firestore()
       .collection("notifications")
       .add({
-        title: "Video Consultation Ready",
+        title: "Video Room Ready",
         message: `Room ${roomId} created`,
         type: "video",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -227,13 +218,17 @@ exports.notifyVideoRoomCreated = onDocumentCreated(
 );
 
 /* =========================
-   ADMIN ROLE
+   ADMIN ROLE (SAFE)
 ========================= */
 exports.setAdminRole = onCall(async (request) => {
-  const caller = request.auth;
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Login required");
+  }
 
-  if (!caller) {
-    throw new HttpsError("unauthenticated", "User must be logged in");
+  const caller = await getUser(request.auth.uid);
+
+  if (caller?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin only");
   }
 
   const { uid } = request.data;
@@ -242,7 +237,7 @@ exports.setAdminRole = onCall(async (request) => {
     admin: true,
   });
 
-  return { message: `User ${uid} is now an admin` };
+  return { message: `User ${uid} is now admin` };
 });
 
 /* =========================
@@ -253,29 +248,22 @@ exports.exportPartnersExcel = onCall(async (request) => {
     throw new HttpsError("unauthenticated", "Login required");
   }
 
+  const caller = await getUser(request.auth.uid);
+
+  if (caller?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin only");
+  }
+
   const XLSX = require("xlsx");
 
   const snapshot = await admin.firestore().collection("partnerRequests").get();
 
-  const data = snapshot.docs.map((doc) => {
-    const d = doc.data();
-    return {
-      Name: d.name,
-      Email: d.email,
-      Phone: d.phone,
-      Organization: d.organization,
-      State: d.state,
-      "Office Address": d.officeAddress,
-      "ID Type": d.idType,
-      "ID Number": d.idNumber,
-      Status: d.status || "pending",
-      Verified: d.verified || false,
-    };
-  });
+  const data = snapshot.docs.map((doc) => doc.data());
 
-  const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Partners");
+  const sheet = XLSX.utils.json_to_sheet(data);
+
+  XLSX.utils.book_append_sheet(workbook, sheet, "Partners");
 
   const buffer = XLSX.write(workbook, {
     type: "buffer",
@@ -291,6 +279,12 @@ exports.exportPartnersExcel = onCall(async (request) => {
 exports.exportPartnersPDF = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Login required");
+  }
+
+  const caller = await getUser(request.auth.uid);
+
+  if (caller?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Admin only");
   }
 
   const PDFDocument = require("pdfkit");
@@ -313,14 +307,9 @@ exports.exportPartnersPDF = onCall(async (request) => {
     doc.fontSize(12).text(`
 Name: ${d.name}
 Email: ${d.email}
-Phone: ${d.phone}
 Org: ${d.organization}
-State: ${d.state}
-ID Type: ${d.idType}
-ID Number: ${d.idNumber}
 Status: ${d.status || "pending"}
-Verified: ${d.verified || false}
-------------------------------------
+------------------------
     `);
   });
 

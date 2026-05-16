@@ -51,39 +51,52 @@ const Signup = () => {
         form.password,
       );
 
-      // SEND VERIFICATION EMAIL
-      await sendEmailVerification(userCred.user, {
+      const user = userCred.user;
+
+      // SEND EMAIL VERIFICATION
+      await sendEmailVerification(user, {
         url: `${window.location.origin}/login`,
       });
 
-      // SAVE USER TO FIRESTORE
-      await setDoc(doc(db, "users", userCred.user.uid), {
-        uid: userCred.user.uid,
+      // SAVE USER PROFILE
+      await setDoc(doc(db, "users", user.uid), {
+        uid: user.uid,
         fullName: form.fullName,
         email: form.email,
-        role: "patient",
+
+        // ROLE SYSTEM READY
+        role: "patient", // default role
+
+        // AUTH STATUS
         verified: false,
+        emailVerified: false,
+
+        // FUTURE SCALING FIELDS
+        status: "active",
         createdAt: serverTimestamp(),
-        status: "Active",
+        lastLogin: null,
       });
 
       alert(
         "Account created successfully. Please verify your email before login.",
       );
 
-      // REDIRECT TO LOGIN
       navigate("/login");
     } catch (error) {
       console.error(error);
 
-      if (error.code === "auth/email-already-in-use") {
-        alert("Email already exists.");
-      } else if (error.code === "auth/invalid-email") {
-        alert("Invalid email address.");
-      } else if (error.code === "auth/weak-password") {
-        alert("Password is too weak.");
-      } else {
-        alert(error.message);
+      switch (error.code) {
+        case "auth/email-already-in-use":
+          alert("Email already exists.");
+          break;
+        case "auth/invalid-email":
+          alert("Invalid email address.");
+          break;
+        case "auth/weak-password":
+          alert("Password is too weak.");
+          break;
+        default:
+          alert(error.message);
       }
     } finally {
       setLoading(false);
