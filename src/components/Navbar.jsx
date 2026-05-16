@@ -10,7 +10,6 @@ const Navbar = () => {
       <div className="mx-auto max-w-screen-xl px-4 sm:px-6 lg:px-8">
         {/* MAIN NAV */}
         <div className="flex h-16 items-center justify-between">
-
           {/* Logo */}
           <a href="#" className="flex items-center text-teal-600">
             <span className="sr-only">Home</span>
@@ -53,17 +52,23 @@ const Navbar = () => {
                 </Link>
               </li>
 
-              
+              <li>
+                <Link
+                  className="hover:text-gray-900 transition"
+                  to="/ai-symptoms-checker"
+                >
+                  AI Checker
+                </Link>
+              </li>
             </ul>
           </nav>
-
-
 
           {/* Buttons + Mobile Icon */}
           <div className="flex items-center gap-3">
             {/* Desktop buttons */}
             <div className="hidden sm:flex items-center gap-3">
-              <Link to="/login"
+              <Link
+                to="/login"
                 className="rounded-md bg-green-700 px-4 py-2 text-sm text-white hover:bg-teal-700"
               >
                 Login
@@ -109,7 +114,7 @@ const Navbar = () => {
               <Link to="/history">History</Link>
               <Link to="/contact">Contact</Link>
               <Link to="/admin-dashboard">Admin Dashboard</Link>
-              
+              <Link to="/ai-symptoms-checker">AI Checker</Link>
 
               <div className="flex gap-3 mt-3">
                 <Link
@@ -119,10 +124,7 @@ const Navbar = () => {
                   Login
                 </Link>
 
-                <Link
-                  to="#"
-                  className="bg-gray-100 px-3 py-2 rounded-md"
-                >
+                <Link to="#" className="bg-gray-100 px-3 py-2 rounded-md">
                   Register
                 </Link>
               </div>
