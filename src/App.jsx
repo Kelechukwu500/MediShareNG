@@ -13,7 +13,7 @@ import Contact from "./pages/Contact";
 // Other Pages
 import AISymptomsChecker from "./OtherPages/AISymptomsChecker";
 import ConnectedDiagnostics from "./OtherPages/ConnectedDiagnostics";
-import WellnessCoaching from "./OtherPages/WellnessCoaching";
+// import WellnessCoaching from "./OtherPages/WellnessCoaching";
 import SmartHealthRecords from "./OtherPages/SmartHealthRecords";
 import DigitalPharmacy from "./OtherPages/DigitalPharmacy";
 import CertifiedSpecialists from "./OtherPages/CertifiedSpecialists";
@@ -115,7 +115,7 @@ const App = () => {
           path="/connected-diagnostics"
           element={<ConnectedDiagnostics />}
         />
-        <Route path="/wellness-coaching" element={<WellnessCoaching />} />
+        {/* <Route path="/wellness-coaching" element={<WellnessCoaching />} /> */}
         <Route path="/smart-health-records" element={<SmartHealthRecords />} />
         <Route path="/digital-pharmacy" element={<DigitalPharmacy />} />
         <Route
