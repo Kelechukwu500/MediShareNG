@@ -18,15 +18,10 @@ const useWebRTC = (roomId, userId, isCaller) => {
   const unsubscribeRef = useRef(null);
   const processedCandidates = useRef(new Set());
 
-  // FIXED: Corrected invalid "stun:://" syntax to standard Google public STUN servers
   const servers = {
     iceServers: [
       {
-        urls: [
-          "stun:://google.com",
-          "stun:://google.com",
-          "stun:://google.com",
-        ],
+        urls: ["stun:://google.com", "stun:://google.com"],
       },
     ],
   };
@@ -57,7 +52,7 @@ const useWebRTC = (roomId, userId, isCaller) => {
 
   const start = async () => {
     try {
-      // 1. ACCESS HARDWARE MEDIA (Both audio and video tracks requested)
+      // 1. ACCESS HARDWARE MEDIA
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true,
@@ -73,21 +68,21 @@ const useWebRTC = (roomId, userId, isCaller) => {
         peerConnection.current.addTrack(track, stream);
       });
 
-      // 3. REMOTE STREAM RACING ENGINE
+      // 3. 🔥 REMOTE STREAM RACING ENGINE FIXED
       peerConnection.current.ontrack = (event) => {
         console.log("📡 Raw tracks received from remote peer.");
 
+        // Check if a full stream array list exists
         if (event.streams && event.streams[0]) {
           remoteStreamRef.current = event.streams[0];
           setRemoteStream(event.streams[0]);
         } else {
+          // Fallback: If track array arrives isolated, construct the stream object manually
           if (!remoteStreamRef.current) {
             remoteStreamRef.current = new MediaStream();
             setRemoteStream(remoteStreamRef.current);
           }
           remoteStreamRef.current.addTrack(event.track);
-          // Force state update to re-render component with complete stream references
-          setRemoteStream(new MediaStream(remoteStreamRef.current.getTracks()));
         }
       };
 
