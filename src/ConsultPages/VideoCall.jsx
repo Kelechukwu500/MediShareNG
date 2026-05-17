@@ -25,14 +25,20 @@ const VideoCall = () => {
         navigate("/login");
       } else {
         setUserId(user.uid);
-        // Fallback to localStorage check if needed, or deduce via roomData later
         setUserRole(localStorage.getItem("userRole") || "patient");
       }
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  // 2. Room Synchronization Engine
+  // 2. 🔥 WebRTC Hook Initialization (FIXED: Run immediately on mount with roomId)
+  const { localStream, remoteStream } = useWebRTC(
+    roomId,
+    userId,
+    roomData?.doctorId === userId,
+  );
+
+  // 3. Room Synchronization Engine
   useEffect(() => {
     if (!roomId || !userId) return;
 
@@ -64,7 +70,7 @@ const VideoCall = () => {
         // Auto-start room values on Doctor connect
         if (isDoctor && !data.active) {
           setWaiting(false);
-          setLoading(false); // Turn off loading immediately before writing to prevent race states
+          setLoading(false);
           try {
             await updateDoc(roomRef, {
               active: true,
@@ -74,7 +80,7 @@ const VideoCall = () => {
           } catch (err) {
             console.error("Failed to activate room:", err);
           }
-          return; // Exit execution block since the incoming update will trigger a clean refresh
+          return;
         }
 
         // Evaluate Waiting Screen Statuses
@@ -95,35 +101,20 @@ const VideoCall = () => {
     return () => unsub();
   }, [roomId, userId, navigate]);
 
-  // 3. WebRTC Stream Handshake Hook
-  const { localStream, remoteStream } = useWebRTC(
-    authorized ? roomId : null,
-    userId,
-    roomData?.doctorId === userId,
-  );
-
-  // 4. Bind Local Video Stream
+  // 4. Bind Local Video Stream (FIXED: Wiped stale reference conditions)
   useEffect(() => {
     if (localVideoRef.current && localStream) {
-      // FIXED: Handled raw stream assignments safely alongside ref properties
-      const streamSource =
-        localStream.current !== undefined ? localStream.current : localStream;
-      if (streamSource && localVideoRef.current.srcObject !== streamSource) {
-        localVideoRef.current.srcObject = streamSource;
+      if (localVideoRef.current.srcObject !== localStream) {
+        localVideoRef.current.srcObject = localStream;
       }
     }
   }, [localStream]);
 
-  // 5. Bind Remote Video Stream
+  // 5. Bind Remote Video Stream (FIXED: Wiped stale reference conditions)
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
-      // FIXED: Handled raw stream assignments safely alongside ref properties
-      const streamSource =
-        remoteStream.current !== undefined
-          ? remoteStream.current
-          : remoteStream;
-      if (streamSource && remoteVideoRef.current.srcObject !== streamSource) {
-        remoteVideoRef.current.srcObject = streamSource;
+      if (remoteVideoRef.current.srcObject !== remoteStream) {
+        remoteVideoRef.current.srcObject = remoteStream;
       }
     }
   }, [remoteStream]);
@@ -135,21 +126,6 @@ const VideoCall = () => {
           <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
           <span>Connecting to secure video channel...</span>
         </div>
-      </div>
-    );
-  }
-
-  if (waiting) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white text-center px-4">
-        <div className="w-16 h-16 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center animate-pulse mb-4">
-          🎥
-        </div>
-        <h2 className="text-2xl font-bold mb-2">Waiting for Doctor...</h2>
-        <p className="text-gray-400 max-w-sm leading-relaxed">
-          The consultation room is initialized. The session will automatically
-          begin the moment your doctor connects.
-        </p>
       </div>
     );
   }
@@ -184,14 +160,29 @@ const VideoCall = () => {
       {/* VIDEO STREAMS GRID */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-130px)]">
         {/* Remote Video Box */}
-        <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl">
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="w-full h-full object-cover transform scale-x-[-1]"
-          />
-          <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 tracking-wider uppercase">
+        <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl flex items-center justify-center">
+          {waiting ? (
+            <div className="text-center px-4 z-10">
+              <div className="w-12 h-12 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center animate-pulse mb-3 mx-auto">
+                🎥
+              </div>
+              <h3 className="text-xl font-bold mb-1 text-white">
+                Waiting for Doctor...
+              </h3>
+              <p className="text-gray-400 text-sm max-w-xs leading-relaxed">
+                The consultation session begins automatically the moment your
+                doctor joins the line.
+              </p>
+            </div>
+          ) : (
+            <video
+              ref={remoteVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-cover transform scale-x-[-1]"
+            />
+          )}
+          <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 tracking-wider uppercase z-20">
             {roomData?.doctorId === userId ? "Patient Feed" : "Doctor Feed"}
           </div>
         </div>
