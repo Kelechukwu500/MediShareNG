@@ -1,11 +1,34 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Stethoscope, Star, ArrowRight } from "lucide-react";
+import { Stethoscope, ArrowRight } from "lucide-react";
 
 const DoctorCard = ({ doctor }) => {
   const navigate = useNavigate();
 
   const handleSelect = () => {
+    if (!doctor?.id) {
+      console.error("Doctor ID missing:", doctor);
+      return;
+    }
+
+    /* =========================================
+       STORE SELECTED DOCTOR (CLEAN FIX)
+    ========================================= */
+    localStorage.setItem(
+      "selectedDoctor",
+      JSON.stringify({
+        id: doctor.id,
+        name: doctor.name,
+        specialty: doctor.specialty,
+        experience: doctor.experience,
+        isOnline: doctor.isOnline,
+        available: doctor.available,
+      }),
+    );
+
+    /* =========================================
+       NAVIGATE TO BOOKING
+    ========================================= */
     navigate(`/book-consultation/${doctor.id}`, {
       state: { doctor },
     });

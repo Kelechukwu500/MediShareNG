@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   addDoc,
   collection,
@@ -11,7 +11,6 @@ import { db, auth } from "../firebase";
 import { CalendarDays } from "lucide-react";
 
 const BookConsultation = () => {
-  const { id } = useParams();
   const navigate = useNavigate();
 
   const handleBook = async () => {
@@ -25,21 +24,25 @@ const BookConsultation = () => {
 
       const selectedDoctor = JSON.parse(localStorage.getItem("selectedDoctor"));
 
-      if (!selectedDoctor) {
-        alert("No doctor selected.");
+      /* =========================
+         FIXED VALIDATION
+      ========================== */
+      if (!selectedDoctor || !selectedDoctor.id) {
+        alert("No doctor selected or invalid doctor data.");
         navigate("/doctors-page");
         return;
       }
 
+      const doctorId = selectedDoctor.id;
+
       /* =========================
-         1. CREATE VIDEO ROOM FIRST
+         1. CREATE VIDEO ROOM
       ========================== */
       const roomRef = await addDoc(collection(db, "videoRooms"), {
-        doctorId: id,
+        doctorId: doctorId,
         patientId: user.uid,
 
-        active: false, // 🔥 DOCTOR must activate
-
+        active: false,
         callStarted: false,
 
         createdAt: serverTimestamp(),
@@ -49,7 +52,7 @@ const BookConsultation = () => {
          2. CREATE APPOINTMENT
       ========================== */
       const appointmentRef = await addDoc(collection(db, "appointments"), {
-        doctorId: id,
+        doctorId: doctorId,
         patientId: user.uid,
 
         doctorName: selectedDoctor.name || "",
@@ -60,7 +63,7 @@ const BookConsultation = () => {
 
         status: "pending",
 
-        videoRoomId: roomRef.id, // 🔥 IMPORTANT FIX
+        videoRoomId: roomRef.id,
 
         type: "video-consultation",
 
@@ -86,9 +89,6 @@ const BookConsultation = () => {
       ========================== */
       alert("Consultation booked successfully.");
 
-      /* =========================
-         6. REDIRECT (DO NOT ENTER CALL YET)
-      ========================== */
       navigate("/patient-dashboard");
     } catch (error) {
       console.error("BOOKING ERROR:", error);

@@ -164,7 +164,8 @@ exports.notifyAppointmentBooked = onDocumentCreated(
 );
 
 /* =========================
-   VIDEO ROOM CREATION (SAFE)
+   VIDEO ROOM CREATION TRIGGER
+   (Fixed to work with Frontend)
 ========================= */
 exports.createVideoRoomOnAppointment = onDocumentCreated(
   "appointments/{appointmentId}",
@@ -172,28 +173,38 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
     const data = event.data.data();
     const appointmentId = event.params.appointmentId;
 
-    if (!data.doctorId || !data.patientId) return;
-    if (data.roomId) return;
+    // Skip if frontend already created the video room
+    if (data.videoRoomId) {
+      console.log(`Video room already created by frontend for appointment: ${appointmentId}`);
+      return;
+    }
+
+    if (!data.doctorId || !data.patientId) {
+      console.log("Missing doctorId or patientId");
+      return;
+    }
 
     const roomRef = admin.firestore().collection("videoRooms").doc();
 
     await roomRef.set({
-      roomId: roomRef.id,
       appointmentId,
       doctorId: data.doctorId,
       patientId: data.patientId,
       active: false,
+      callStarted: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    await admin
-      .firestore()
+    // Link back to appointment
+    await admin.firestore()
       .collection("appointments")
       .doc(appointmentId)
       .update({
-        roomId: roomRef.id,
+        videoRoomId: roomRef.id,
       });
-  },
+
+    console.log(`Video room created successfully for appointment: ${appointmentId}`);
+  }
 );
 
 /* =========================

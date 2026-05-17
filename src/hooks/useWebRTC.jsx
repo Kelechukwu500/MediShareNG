@@ -14,6 +14,8 @@ const useWebRTC = (roomId, userId, isCaller) => {
   const peerConnection = useRef(null);
   const unsubscribeRef = useRef(null);
 
+  const processedCandidates = useRef(new Set());
+
   const servers = {
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
   };
@@ -25,10 +27,18 @@ const useWebRTC = (roomId, userId, isCaller) => {
 
     return () => {
       if (peerConnection.current) {
+        peerConnection.current.getSenders().forEach((sender) => {
+          if (sender.track) sender.track.stop();
+        });
         peerConnection.current.close();
       }
+
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
+      }
+
+      if (localStream.current) {
+        localStream.current.getTracks().forEach((t) => t.stop());
       }
     };
   }, [roomId, userId]);
@@ -36,7 +46,7 @@ const useWebRTC = (roomId, userId, isCaller) => {
   const start = async () => {
     try {
       // ===========================
-      // GET USER MEDIA
+      // GET MEDIA
       // ===========================
       localStream.current = await navigator.mediaDevices.getUserMedia({
         video: true,
@@ -44,40 +54,38 @@ const useWebRTC = (roomId, userId, isCaller) => {
       });
 
       // ===========================
-      // CREATE PEER CONNECTION
+      // PEER CONNECTION
       // ===========================
       peerConnection.current = new RTCPeerConnection(servers);
 
-      // Add local tracks
       localStream.current.getTracks().forEach((track) => {
         peerConnection.current.addTrack(track, localStream.current);
       });
 
-      // Remote stream handling
+      // ===========================
+      // REMOTE STREAM FIX
+      // ===========================
       peerConnection.current.ontrack = (event) => {
-        event.streams[0].getTracks().forEach((track) => {
-          remoteStream.current.addTrack(track);
-        });
+        remoteStream.current = event.streams[0];
       };
 
       const roomRef = doc(db, "videoRooms", roomId);
 
       // ===========================
-      // ICE CANDIDATES (SEND)
+      // ICE CANDIDATES SEND
       // ===========================
       peerConnection.current.onicecandidate = async (event) => {
         if (!event.candidate) return;
 
-        const candidate = event.candidate.toJSON();
-
         await updateDoc(roomRef, {
-          [isCaller ? "offerCandidates" : "answerCandidates"]:
-            arrayUnion(candidate),
+          [isCaller ? "offerCandidates" : "answerCandidates"]: arrayUnion(
+            event.candidate.toJSON(),
+          ),
         });
       };
 
       // ===========================
-      // GET ROOM DATA
+      // GET ROOM
       // ===========================
       const roomSnap = await getDoc(roomRef);
       const roomData = roomSnap.data();
@@ -85,17 +93,14 @@ const useWebRTC = (roomId, userId, isCaller) => {
       if (!roomData) return;
 
       // ===========================
-      // CALLER CREATES OFFER
+      // CREATE OFFER
       // ===========================
       if (isCaller && !roomData.offer) {
         const offer = await peerConnection.current.createOffer();
         await peerConnection.current.setLocalDescription(offer);
 
         await updateDoc(roomRef, {
-          offer: {
-            type: offer.type,
-            sdp: offer.sdp,
-          },
+          offer: offer.toJSON(),
         });
       }
 
@@ -104,10 +109,10 @@ const useWebRTC = (roomId, userId, isCaller) => {
       // ===========================
       unsubscribeRef.current = onSnapshot(roomRef, async (snap) => {
         const data = snap.data();
-        if (!data) return;
+        if (!data || !peerConnection.current) return;
 
         // ===========================
-        // HANDLE OFFER (PATIENT)
+        // HANDLE OFFER
         // ===========================
         if (
           data.offer &&
@@ -122,31 +127,37 @@ const useWebRTC = (roomId, userId, isCaller) => {
           await peerConnection.current.setLocalDescription(answer);
 
           await updateDoc(roomRef, {
-            answer: {
-              type: answer.type,
-              sdp: answer.sdp,
-            },
+            answer: answer.toJSON(),
           });
         }
 
         // ===========================
-        // HANDLE ANSWER (DOCTOR)
+        // HANDLE ANSWER
         // ===========================
-        if (data.answer && isCaller) {
+        if (
+          data.answer &&
+          isCaller &&
+          !peerConnection.current.currentRemoteDescription
+        ) {
           await peerConnection.current.setRemoteDescription(
             new RTCSessionDescription(data.answer),
           );
         }
 
         // ===========================
-        // HANDLE ICE CANDIDATES (REMOTE → LOCAL)
+        // HANDLE ICE CANDIDATES (FIXED)
         // ===========================
-        const candidateList = isCaller
+        const candidates = isCaller
           ? data.answerCandidates
           : data.offerCandidates;
 
-        if (candidateList && peerConnection.current) {
-          candidateList.forEach(async (candidate) => {
+        if (candidates?.length) {
+          for (const candidate of candidates) {
+            const key = JSON.stringify(candidate);
+
+            if (processedCandidates.current.has(key)) continue;
+            processedCandidates.current.add(key);
+
             try {
               await peerConnection.current.addIceCandidate(
                 new RTCIceCandidate(candidate),
@@ -154,7 +165,7 @@ const useWebRTC = (roomId, userId, isCaller) => {
             } catch (err) {
               console.warn("ICE error:", err);
             }
-          });
+          }
         }
       });
     } catch (error) {

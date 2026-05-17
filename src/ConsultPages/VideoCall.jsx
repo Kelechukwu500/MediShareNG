@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import useWebRTC from "../hooks/useWebRTC";
 
 const VideoCall = () => {
@@ -16,18 +16,28 @@ const VideoCall = () => {
   const [roomData, setRoomData] = useState(null);
   const [waiting, setWaiting] = useState(false);
 
-  const user = auth.currentUser;
-
-  const userId = user?.uid;
+  const [userId, setUserId] = useState(null);
 
   // ===============================
-  // VALIDATE ROOM ACCESS + REALTIME ROOM STATE
+  // AUTH LISTENER
   // ===============================
   useEffect(() => {
-    if (!roomId || !userId) {
-      navigate("/login");
-      return;
-    }
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        navigate("/login");
+      } else {
+        setUserId(user.uid);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
+
+  // ===============================
+  // ROOM LISTENER
+  // ===============================
+  useEffect(() => {
+    if (!roomId || !userId) return;
 
     const roomRef = doc(db, "videoRooms", roomId);
 
@@ -47,7 +57,6 @@ const VideoCall = () => {
         return;
       }
 
-      // 🔥 BLOCK UNTIL DOCTOR ACTIVATES SESSION
       if (!data.active) {
         setWaiting(true);
         setAuthorized(false);
@@ -63,17 +72,21 @@ const VideoCall = () => {
   }, [roomId, userId, navigate]);
 
   // ===============================
-  // DETERMINE ROLE (SAFE)
+  // CORRECT ROLE DETECTION
   // ===============================
   const isCaller = roomData?.doctorId === userId;
 
   // ===============================
-  // WEBRTC HOOK
+  // WEBSRTC HOOK
   // ===============================
-  const { localStream, remoteStream } = useWebRTC(roomId, userId, isCaller);
+  const { localStream, remoteStream } = useWebRTC(
+    authorized ? roomId : null,
+    userId,
+    isCaller,
+  );
 
   // ===============================
-  // ATTACH LOCAL STREAM
+  // LOCAL STREAM
   // ===============================
   useEffect(() => {
     if (localStream?.current && localVideoRef.current) {
@@ -82,7 +95,7 @@ const VideoCall = () => {
   }, [localStream]);
 
   // ===============================
-  // ATTACH REMOTE STREAM
+  // REMOTE STREAM
   // ===============================
   useEffect(() => {
     if (remoteStream?.current && remoteVideoRef.current) {
@@ -91,7 +104,7 @@ const VideoCall = () => {
   }, [remoteStream]);
 
   // ===============================
-  // LOADING STATE
+  // LOADING
   // ===============================
   if (loading) {
     return (
@@ -102,7 +115,7 @@ const VideoCall = () => {
   }
 
   // ===============================
-  // WAITING FOR DOCTOR APPROVAL
+  // WAITING
   // ===============================
   if (waiting) {
     return (
@@ -110,7 +123,6 @@ const VideoCall = () => {
         <h2 className="text-2xl font-bold mb-3">
           Waiting for doctor to start session...
         </h2>
-
         <p className="text-gray-400">
           You will be connected automatically once the doctor approves.
         </p>
@@ -118,9 +130,7 @@ const VideoCall = () => {
     );
   }
 
-  if (!authorized) {
-    return null;
-  }
+  if (!authorized) return null;
 
   return (
     <div className="min-h-screen bg-black grid grid-cols-1 md:grid-cols-2 gap-4 p-4">
