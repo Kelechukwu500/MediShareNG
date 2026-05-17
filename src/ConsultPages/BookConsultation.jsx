@@ -1,11 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import {
-  addDoc,
-  collection,
-  updateDoc,
-  doc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 
 import { db, auth } from "../firebase";
 import { CalendarDays } from "lucide-react";
@@ -34,8 +28,8 @@ const BookConsultation = () => {
         return;
       }
 
-      // FIXED: Prioritize uid, fallback to id
-      const doctorId = selectedDoctor.uid || selectedDoctor.id;
+      // FIXED: Prioritize .id over .uid to guarantee the correct Firestore document reference string is saved
+      const doctorId = selectedDoctor.id || selectedDoctor.uid;
 
       if (!doctorId) {
         alert(
@@ -48,21 +42,11 @@ const BookConsultation = () => {
       console.log("✅ Booking appointment for Doctor ID:", doctorId);
 
       /* =========================
-         1. CREATE VIDEO ROOM
-      ========================== */
-      const roomRef = await addDoc(collection(db, "videoRooms"), {
-        doctorId: doctorId,
-        patientId: user.uid,
-        active: false,
-        callStarted: false,
-        createdAt: serverTimestamp(),
-      });
-
-      /* =========================
-         2. CREATE APPOINTMENT
+         CREATE APPOINTMENT ONLY
+         (Video Room is now automatically created by your backend Cloud Function)
       ========================== */
       const appointmentRef = await addDoc(collection(db, "appointments"), {
-        doctorId: doctorId,
+        doctorId: doctorId, // FIXED: Now passes the exact, authentic Firestore Doctor document ID string
         patientId: user.uid,
 
         doctorName: selectedDoctor.name || selectedDoctor.fullName || "Doctor",
@@ -72,29 +56,20 @@ const BookConsultation = () => {
         patientName: user.displayName || user.email?.split("@")[0] || "Patient",
 
         status: "pending",
-
-        videoRoomId: roomRef.id,
+        videoRoomId: null, // Initialized as null; your deployed Cloud Function updates this automatically
         type: "video-consultation",
 
         createdAt: serverTimestamp(),
       });
 
       /* =========================
-         3. LINK ROOM TO APPOINTMENT
-      ========================== */
-      await updateDoc(doc(db, "videoRooms", roomRef.id), {
-        appointmentId: appointmentRef.id,
-      });
-
-      /* =========================
-         4. STORE SESSION DATA
+         STORE SESSION DATA
       ========================== */
       localStorage.setItem("appointmentId", appointmentRef.id);
-      localStorage.setItem("roomId", roomRef.id);
       localStorage.setItem("selectedDoctor", JSON.stringify(selectedDoctor));
 
       /* =========================
-         5. SUCCESS
+         SUCCESS
       ========================== */
       alert(
         "Consultation booked successfully! The doctor will review it soon.",
