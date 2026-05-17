@@ -16,26 +16,32 @@ const VideoCall = () => {
   const [roomData, setRoomData] = useState(null);
   const [waiting, setWaiting] = useState(false);
   const [userId, setUserId] = useState(null);
-  const [userRole, setUserRole] = useState(null);
 
-  // 1. Auth & Role Session Listener
+  // FIXED: Initialize role directly from storage to eliminate async delay race-conditions
+  const [userRole, setUserRole] = useState(
+    () => localStorage.getItem("userRole") || "patient",
+  );
+
+  // 1. Auth Session Listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (!user) {
         navigate("/login");
       } else {
         setUserId(user.uid);
-        setUserRole(localStorage.getItem("userRole") || "patient");
+        if (localStorage.getItem("userRole")) {
+          setUserRole(localStorage.getItem("userRole"));
+        }
       }
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  // 2. 🔥 WebRTC Hook Initialization (FIXED: Run immediately on mount with roomId)
+  // 2. 🔥 WebRTC Hook Initialization (FIXED: Deduce isCaller strictly using the immediate role value)
   const { localStream, remoteStream } = useWebRTC(
     roomId,
     userId,
-    roomData?.doctorId === userId,
+    userRole === "doctor", // 🔥 Safe, instant role evaluation
   );
 
   // 3. Room Synchronization Engine
@@ -101,7 +107,7 @@ const VideoCall = () => {
     return () => unsub();
   }, [roomId, userId, navigate]);
 
-  // 4. Bind Local Video Stream (FIXED: Wiped stale reference conditions)
+  // 4. Bind Local Video Stream
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       if (localVideoRef.current.srcObject !== localStream) {
@@ -110,7 +116,7 @@ const VideoCall = () => {
     }
   }, [localStream]);
 
-  // 5. Bind Remote Video Stream (FIXED: Wiped stale reference conditions)
+  // 5. Bind Remote Video Stream
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       if (remoteVideoRef.current.srcObject !== remoteStream) {
@@ -183,7 +189,7 @@ const VideoCall = () => {
             />
           )}
           <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 tracking-wider uppercase z-20">
-            {roomData?.doctorId === userId ? "Patient Feed" : "Doctor Feed"}
+            {userRole === "doctor" ? "Patient Feed" : "Doctor Feed"}
           </div>
         </div>
 
