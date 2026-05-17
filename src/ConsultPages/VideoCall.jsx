@@ -16,13 +16,10 @@ const VideoCall = () => {
   const [roomData, setRoomData] = useState(null);
   const [waiting, setWaiting] = useState(false);
   const [userId, setUserId] = useState(null);
-
-  // FIXED: Initialize role directly from storage to eliminate async delay race-conditions
   const [userRole, setUserRole] = useState(
     () => localStorage.getItem("userRole") || "patient",
   );
 
-  // 1. Auth Session Listener
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (!user) {
@@ -37,14 +34,12 @@ const VideoCall = () => {
     return () => unsubscribe();
   }, [navigate]);
 
-  // 2. 🔥 WebRTC Hook Initialization (FIXED: Deduce isCaller strictly using the immediate role value)
   const { localStream, remoteStream } = useWebRTC(
     roomId,
     userId,
-    userRole === "doctor", // 🔥 Safe, instant role evaluation
+    userRole === "doctor",
   );
 
-  // 3. Room Synchronization Engine
   useEffect(() => {
     if (!roomId || !userId) return;
 
@@ -73,7 +68,6 @@ const VideoCall = () => {
 
         setAuthorized(true);
 
-        // Auto-start room values on Doctor connect
         if (isDoctor && !data.active) {
           setWaiting(false);
           setLoading(false);
@@ -89,7 +83,6 @@ const VideoCall = () => {
           return;
         }
 
-        // Evaluate Waiting Screen Statuses
         if (!data.active) {
           setWaiting(true);
         } else {
@@ -107,7 +100,6 @@ const VideoCall = () => {
     return () => unsub();
   }, [roomId, userId, navigate]);
 
-  // 4. Bind Local Video Stream
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       if (localVideoRef.current.srcObject !== localStream) {
@@ -116,7 +108,6 @@ const VideoCall = () => {
     }
   }, [localStream]);
 
-  // 5. Bind Remote Video Stream
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       if (remoteVideoRef.current.srcObject !== remoteStream) {
@@ -138,7 +129,6 @@ const VideoCall = () => {
 
   return (
     <div className="min-h-screen bg-gray-950 p-4 font-sans antialiased">
-      {/* HEADER BAR */}
       <div className="max-w-7xl mx-auto flex justify-between items-center text-white mb-4 bg-gray-900/50 backdrop-blur px-6 py-4 rounded-2xl border border-gray-800">
         <div>
           <h2 className="text-lg font-bold text-gray-100">
@@ -157,27 +147,23 @@ const VideoCall = () => {
                 : "/patient-dashboard",
             )
           }
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-red-900/20 text-sm"
+          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg"
         >
           End Session
         </button>
       </div>
 
-      {/* VIDEO STREAMS GRID */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-130px)]">
-        {/* Remote Video Box */}
+        {/* Remote View */}
         <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl flex items-center justify-center">
           {waiting ? (
-            <div className="text-center px-4 z-10">
-              <div className="w-12 h-12 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center justify-center animate-pulse mb-3 mx-auto">
-                🎥
-              </div>
+            <div className="text-center px-4">
               <h3 className="text-xl font-bold mb-1 text-white">
-                Waiting for Doctor...
+                Waiting for Connection...
               </h3>
               <p className="text-gray-400 text-sm max-w-xs leading-relaxed">
-                The consultation session begins automatically the moment your
-                doctor joins the line.
+                The session will begin automatically when the other participant
+                arrives.
               </p>
             </div>
           ) : (
@@ -185,15 +171,15 @@ const VideoCall = () => {
               ref={remoteVideoRef}
               autoPlay
               playsInline
-              className="w-full h-full object-cover transform scale-x-[-1]"
+              className="w-full h-full object-cover"
             />
           )}
-          <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 tracking-wider uppercase z-20">
+          <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase z-20">
             {userRole === "doctor" ? "Patient Feed" : "Doctor Feed"}
           </div>
         </div>
 
-        {/* Local Video Box */}
+        {/* Local View */}
         <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl">
           <video
             ref={localVideoRef}
@@ -202,7 +188,7 @@ const VideoCall = () => {
             muted
             className="w-full h-full object-cover transform scale-x-[-1]"
           />
-          <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 tracking-wider uppercase">
+          <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase">
             You (Your Camera)
           </div>
         </div>
