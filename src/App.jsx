@@ -11,7 +11,7 @@ import Login from "./components/Login";
 import PatientDashboard from "./pages/Dashboard";
 import DoctorDashboard from "./pages/History"; // Placeholder routes mapped from your collection list
 import AdminDashboard from "./pages/home";
-import VideoCall from "./components/VideoCall";
+import VideoCall from "./ConsultPages/VideoCall";
 
 // ROUTE PROTECTION COMPONENTS
 const ProtectedRoute = ({ children, allowedRoles }) => {
