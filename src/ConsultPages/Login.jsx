@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   signInWithEmailAndPassword,
   sendEmailVerification,
+  signOut, // 🔥 ADDED: Imported signOut to safely terminate unverified sessions
 } from "firebase/auth";
 
 import { auth, db } from "../firebase";
@@ -59,13 +60,18 @@ const Login = () => {
       console.log("AUTH UID:", user.uid);
 
       /* =========================
-         EMAIL VERIFICATION CHECK
+         EMAIL VERIFICATION CHECK (FIXED)
       ========================== */
       if (!user.emailVerified) {
         alert("Please verify your email before logging in.");
 
-        setLoading(false);
+        // 🔥 FIXED: Forcefully sign out from Firebase Auth to terminate the active session token
+        await signOut(auth);
 
+        // Clear localStorage cache to prevent old local dashboard data bleed
+        localStorage.clear();
+
+        setLoading(false);
         return;
       }
 
@@ -83,8 +89,11 @@ const Login = () => {
           `User profile not found.\n\nCreate this document in Firestore:\nusers/${user.uid}`,
         );
 
-        setLoading(false);
+        // Force logout if Auth exists but Firestore record is completely missing
+        await signOut(auth);
+        localStorage.clear();
 
+        setLoading(false);
         return;
       }
 

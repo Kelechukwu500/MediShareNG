@@ -18,6 +18,7 @@ const BookConsultation = () => {
       const user = auth.currentUser;
 
       if (!user) {
+        alert("Please login to book an appointment");
         navigate("/login");
         return;
       }
@@ -25,15 +26,26 @@ const BookConsultation = () => {
       const selectedDoctor = JSON.parse(localStorage.getItem("selectedDoctor"));
 
       /* =========================
-         FIXED VALIDATION
+         VALIDATION
       ========================== */
-      if (!selectedDoctor || !selectedDoctor.id) {
-        alert("No doctor selected or invalid doctor data.");
+      if (!selectedDoctor) {
+        alert("No doctor selected. Please select a doctor again.");
         navigate("/doctors-page");
         return;
       }
 
-      const doctorId = selectedDoctor.id;
+      // FIXED: Prioritize uid, fallback to id
+      const doctorId = selectedDoctor.uid || selectedDoctor.id;
+
+      if (!doctorId) {
+        alert(
+          "Doctor information is incomplete. Please select the doctor again.",
+        );
+        navigate("/doctors-page");
+        return;
+      }
+
+      console.log("✅ Booking appointment for Doctor ID:", doctorId);
 
       /* =========================
          1. CREATE VIDEO ROOM
@@ -41,10 +53,8 @@ const BookConsultation = () => {
       const roomRef = await addDoc(collection(db, "videoRooms"), {
         doctorId: doctorId,
         patientId: user.uid,
-
         active: false,
         callStarted: false,
-
         createdAt: serverTimestamp(),
       });
 
@@ -55,16 +65,15 @@ const BookConsultation = () => {
         doctorId: doctorId,
         patientId: user.uid,
 
-        doctorName: selectedDoctor.name || "",
+        doctorName: selectedDoctor.name || selectedDoctor.fullName || "Doctor",
         doctorSpecialty: selectedDoctor.specialty || "",
 
         patientEmail: user.email || "",
-        patientName: user.displayName || user.email || "Patient",
+        patientName: user.displayName || user.email?.split("@")[0] || "Patient",
 
         status: "pending",
 
         videoRoomId: roomRef.id,
-
         type: "video-consultation",
 
         createdAt: serverTimestamp(),
@@ -87,12 +96,14 @@ const BookConsultation = () => {
       /* =========================
          5. SUCCESS
       ========================== */
-      alert("Consultation booked successfully.");
+      alert(
+        "Consultation booked successfully! The doctor will review it soon.",
+      );
 
       navigate("/patient-dashboard");
     } catch (error) {
       console.error("BOOKING ERROR:", error);
-      alert(error.message || "Failed to book consultation.");
+      alert("Failed to book consultation. Please try again.");
     }
   };
 
@@ -131,14 +142,14 @@ const BookConsultation = () => {
 
           <button
             onClick={handleBook}
-            className="w-full mt-8 bg-gradient-to-r from-[#065f46] to-[#2bb673] text-white p-4 rounded-2xl font-bold shadow-lg"
+            className="w-full mt-8 bg-gradient-to-r from-[#065f46] to-[#2bb673] text-white p-4 rounded-2xl font-bold shadow-lg hover:brightness-105 transition"
           >
             Confirm Booking
           </button>
 
           <button
             onClick={() => navigate("/doctors-page")}
-            className="w-full mt-4 border border-[#065f46] text-[#065f46] p-4 rounded-2xl font-semibold"
+            className="w-full mt-4 border border-[#065f46] text-[#065f46] p-4 rounded-2xl font-semibold hover:bg-gray-50 transition"
           >
             Back to Doctors
           </button>

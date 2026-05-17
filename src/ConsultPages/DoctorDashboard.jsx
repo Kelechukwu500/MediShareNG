@@ -60,9 +60,10 @@ const DoctorDashboard = () => {
     );
   }
 
+  
   /* =========================
-     REAL-TIME APPOINTMENTS
-  ========================== */
+   REAL-TIME APPOINTMENTS - IMPROVED
+========================== */
   useEffect(() => {
     if (!doctorId) return;
 
@@ -71,30 +72,30 @@ const DoctorDashboard = () => {
     const q = query(
       collection(db, "appointments"),
       where("doctorId", "==", doctorId),
-      orderBy("createdAt", "desc"), // Newest first
+      orderBy("createdAt", "desc"),
     );
 
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setIsLoading(false);
         const data = snap.docs.map((d) => ({
           id: d.id,
           ...d.data(),
         }));
 
-        console.log(`📊 Snapshot received: ${snap.size} appointments`, data);
+        console.log(`📊 Received ${snap.size} appointments:`, data);
 
+        // Show toast only for real new appointments
         if (data.length > previousCountRef.current) {
           toast.success("New consultation request received!");
         }
 
         previousCountRef.current = data.length;
         setAppointments(data);
+        setIsLoading(false); // Add this if you have isLoading state
       },
       (error) => {
-        console.error("❌ Firestore Query Error:", error);
-        setIsLoading(false);
+        console.error("Firestore Error:", error);
         toast.error("Error loading appointments");
       },
     );
@@ -211,6 +212,6 @@ const DoctorDashboard = () => {
       </div>
     </div>
   );
-};
+};;
 
 export default DoctorDashboard;

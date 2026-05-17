@@ -5,34 +5,36 @@ import { Stethoscope, ArrowRight } from "lucide-react";
 const DoctorCard = ({ doctor }) => {
   const navigate = useNavigate();
 
-  const handleSelect = () => {
-    if (!doctor?.id) {
-      console.error("Doctor ID missing:", doctor);
-      return;
-    }
+    const handleSelect = () => {
+      if (!doctor?.id) {
+        console.error("Doctor ID missing:", doctor);
+        return;
+      }
 
-    /* =========================================
+      /* =========================================
        STORE SELECTED DOCTOR (CLEAN FIX)
     ========================================= */
-    localStorage.setItem(
-      "selectedDoctor",
-      JSON.stringify({
-        id: doctor.id,
-        name: doctor.name,
-        specialty: doctor.specialty,
-        experience: doctor.experience,
-        isOnline: doctor.isOnline,
-        available: doctor.available,
-      }),
-    );
+      localStorage.setItem(
+        "selectedDoctor",
+        JSON.stringify({
+          id: doctor.id,
+          uid: doctor.id, // 🔥 ADD THIS LINE to match your BookConsultation expectations
+          name: doctor.name,
+          specialty: doctor.specialty,
+          experience: doctor.experience,
+          isOnline: doctor.isOnline,
+          available: doctor.available,
+        }),
+      );
 
-    /* =========================================
+      /* =========================================
        NAVIGATE TO BOOKING
     ========================================= */
-    navigate(`/book-consultation/${doctor.id}`, {
-      state: { doctor },
-    });
-  };
+      navigate(`/book-consultation/${doctor.id}`, {
+        state: { doctor },
+      });
+    };
+
 
   return (
     <div className="bg-white rounded-2xl shadow-md p-6 hover:shadow-xl transition border">

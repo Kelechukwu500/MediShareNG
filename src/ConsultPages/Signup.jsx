@@ -2,21 +2,17 @@ import { useState } from "react";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
+  signOut, // 🔥 IMPORTED: For closing background auth sessions immediately
 } from "firebase/auth";
 
 import { auth, db } from "../firebase";
-
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-
 import { useNavigate } from "react-router-dom";
-
 import { ShieldCheck, MailCheck, UserPlus, ArrowRight } from "lucide-react";
 
 const Signup = () => {
   const navigate = useNavigate();
-
   const [loading, setLoading] = useState(false);
-
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -44,7 +40,7 @@ const Signup = () => {
     try {
       setLoading(true);
 
-      // CREATE USER
+      // 1. CREATE AUTH USER
       const userCred = await createUserWithEmailAndPassword(
         auth,
         form.email,
@@ -53,12 +49,12 @@ const Signup = () => {
 
       const user = userCred.user;
 
-      // SEND EMAIL VERIFICATION
+      // 2. SEND EMAIL VERIFICATION
       await sendEmailVerification(user, {
         url: `${window.location.origin}/login`,
       });
 
-      // SAVE USER PROFILE
+      // 3. SAVE USER PROFILE IN FIRESTORE
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         fullName: form.fullName,
@@ -80,6 +76,10 @@ const Signup = () => {
       alert(
         "Account created successfully. Please verify your email before login.",
       );
+
+      // 4. 🔥 TERMINATE UNVERIFIED BACKGROUND HANDSHAKE SESSION IMMEDIATELY
+      await signOut(auth);
+      localStorage.clear();
 
       navigate("/login");
     } catch (error) {
@@ -180,6 +180,7 @@ const Signup = () => {
                 value={form.fullName}
                 onChange={handleChange}
                 placeholder="Enter full name"
+                required
                 className="mt-2 w-full h-14 px-4 rounded-2xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#2bb673]"
               />
             </div>
@@ -196,6 +197,7 @@ const Signup = () => {
                 value={form.email}
                 onChange={handleChange}
                 placeholder="Enter email address"
+                required
                 className="mt-2 w-full h-14 px-4 rounded-2xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#2bb673]"
               />
             </div>
@@ -212,6 +214,7 @@ const Signup = () => {
                 value={form.password}
                 onChange={handleChange}
                 placeholder="Enter password"
+                required
                 className="mt-2 w-full h-14 px-4 rounded-2xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#2bb673]"
               />
             </div>
@@ -245,13 +248,12 @@ const Signup = () => {
 
                 <div>
                   <h3 className="font-bold text-[#065f46]">
-                    Email Verification Required
+                    Verification Notice
                   </h3>
-
-                  <p className="mt-2 text-sm text-gray-600 leading-relaxed">
-                    After signup, a verification link will be sent to your
-                    email. You must verify your account before logging in and
-                    starting consultation sessions.
+                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                    A confirmation link will be sent to your email immediately.
+                    Please follow the instructions to unlock your account
+                    features.
                   </p>
                 </div>
               </div>

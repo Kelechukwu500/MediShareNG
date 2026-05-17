@@ -175,7 +175,9 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
 
     // Skip if frontend already created the video room
     if (data.videoRoomId) {
-      console.log(`Video room already created by frontend for appointment: ${appointmentId}`);
+      console.log(
+        `Video room already created by frontend for appointment: ${appointmentId}`,
+      );
       return;
     }
 
@@ -196,15 +198,18 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
     });
 
     // Link back to appointment
-    await admin.firestore()
+    await admin
+      .firestore()
       .collection("appointments")
       .doc(appointmentId)
       .update({
         videoRoomId: roomRef.id,
       });
 
-    console.log(`Video room created successfully for appointment: ${appointmentId}`);
-  }
+    console.log(
+      `Video room created successfully for appointment: ${appointmentId}`,
+    );
+  },
 );
 
 /* =========================
