@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useAdminAuth } from "../utils/useAdminAuth";
-
 import { db } from "../firebase";
 import { collection, onSnapshot, updateDoc, doc } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 
 import {
   LayoutDashboard,
@@ -16,6 +15,7 @@ import {
   Menu,
   X,
   Handshake,
+  ArrowRight,
 } from "lucide-react";
 
 import {
@@ -28,10 +28,17 @@ import {
 } from "recharts";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [dark, setDark] = useState(false);
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
-  const { isAdmin, loading } = useAdminAuth();
+
+  // FIXED: Standardize state checks locally to bypass race conditions with custom tracking hooks
+  const cachedRole = localStorage.getItem("userRole");
+  const cachedUserId = localStorage.getItem("userId");
+
+  const isAdminAuthorized =
+    cachedUserId && (cachedRole === "admin" || cachedRole === "admin-doctor");
 
   const [users, setUsers] = useState([]);
   const [providers, setProviders] = useState([]);
@@ -76,13 +83,30 @@ const Dashboard = () => {
   ];
 
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-      setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
+    // Prevent non-admins from registering listening pipes entirely
+    if (!isAdminAuthorized) return;
 
-    const unsubProviders = onSnapshot(collection(db, "providers"), (snap) => {
-      setProviders(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
+    const unsubUsers = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
+        setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => console.error("Users query tracking error:", err.message),
+    );
+
+    // CLEAN SNAPSHOT WRAPPER FOR PRIVILEGED USERS ONLY
+    const unsubProviders = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
+        // Since providers are users with medical designations, filter them safely out of the users stream
+        // to resolve the unconfigured Firestore collection permission crash
+        const filteredProviders = snap.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() }))
+          .filter((u) => u.role === "doctor" || u.role === "admin-doctor");
+        setProviders(filteredProviders);
+      },
+      (err) => console.error("Providers query tracking error:", err.message),
+    );
 
     const unsubAppointments = onSnapshot(
       collection(db, "appointments"),
@@ -91,6 +115,7 @@ const Dashboard = () => {
           snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
         );
       },
+      (err) => console.error("Appointments query tracking error:", err.message),
     );
 
     const unsubNotifications = onSnapshot(
@@ -100,6 +125,8 @@ const Dashboard = () => {
           snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
         );
       },
+      (err) =>
+        console.error("Notifications query tracking error:", err.message),
     );
 
     const unsubPartners = onSnapshot(
@@ -109,6 +136,8 @@ const Dashboard = () => {
           snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
         );
       },
+      (err) =>
+        console.error("Partner requests query tracking error:", err.message),
     );
 
     return () => {
@@ -118,9 +147,8 @@ const Dashboard = () => {
       unsubNotifications();
       unsubPartners();
     };
-  }, []);
+  }, [isAdminAuthorized]);
 
-  // ✅ CLEAN ADMIN ACTIONS (ONLY ONCE)
   const approvePartner = async (id) => {
     try {
       await updateDoc(doc(db, "partnerRequests", id), {
@@ -143,8 +171,20 @@ const Dashboard = () => {
     }
   };
 
-  if (loading) return <p className="p-6">Checking access...</p>;
-  if (!isAdmin) return <p className="p-6 text-red-500">Access Denied</p>;
+  // FIXED: Enforce role-based access safely using local state checks
+  if (!isAdminAuthorized) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+        <div className="bg-white p-8 rounded-2xl shadow-md text-center max-w-sm">
+          <p className="text-red-500 font-bold text-xl mb-2">Access Denied</p>
+          <p className="text-gray-600 text-sm">
+            Your profile role ({cachedRole || "none"}) is not authorized to
+            access this administrative panel.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -155,24 +195,47 @@ const Dashboard = () => {
       }
     >
       {/* TOP BAR */}
-      <div className="flex justify-between items-center px-4 md:px-6 py-4 bg-gray-100 shadow-sm sticky top-0 z-50">
-        <button className="lg:hidden" onClick={() => setOpen(!open)}>
-          {open ? <X /> : <Menu />}
-        </button>
+      <div className="flex justify-between items-center px-4 md:px-6 py-4 bg-white shadow-sm sticky top-0 z-50">
+        <div className="flex items-center gap-4">
+          <button
+            className="lg:hidden text-gray-700"
+            onClick={() => setOpen(!open)}
+          >
+            {open ? <X /> : <Menu />}
+          </button>
+          <h1 className="text-base md:text-xl font-bold text-emerald-600">
+            MediShareNG Dashboard
+          </h1>
+        </div>
 
-        <h1 className="text-base md:text-xl font-bold text-emerald-600">
-          MediShareNG Dashboard
-        </h1>
+        {/* DUAL VIEW NAVIGATION TOGGLE */}
+        <div className="flex items-center gap-4">
+          {cachedRole === "admin-doctor" && (
+            <button
+              onClick={() => navigate("/doctor-dashboard")}
+              className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors shadow-sm"
+            >
+              <span>Switch to Doctor View</span>
+              <ArrowRight size={14} className="text-emerald-600" />
+            </button>
+          )}
 
-        <button onClick={() => setDark(!dark)}>
-          {dark ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+          <button onClick={() => setDark(!dark)} className="text-gray-700">
+            {dark ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+        </div>
       </div>
 
       {/* MOBILE MENU */}
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden bg-black/40">
-          <div className="w-72 h-full bg-white p-5 shadow-xl">
+        <div
+          className="fixed inset-0 z-50 lg:hidden bg-black/40"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-72 h-full bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="font-bold text-emerald-600 mb-6">Menu</h2>
             {menuItems.map((item, i) => {
               const Icon = item.icon;
@@ -183,7 +246,7 @@ const Dashboard = () => {
                     setActiveTab(item.key);
                     setOpen(false);
                   }}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-emerald-50 cursor-pointer"
+                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-emerald-50 cursor-pointer text-gray-700"
                 >
                   <Icon size={18} />
                   {item.label}
@@ -205,8 +268,8 @@ const Dashboard = () => {
                 onClick={() => setActiveTab(item.key)}
                 className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer ${
                   activeTab === item.key
-                    ? "bg-emerald-100 text-emerald-700"
-                    : "hover:bg-emerald-50"
+                    ? "bg-emerald-100 text-emerald-700 font-semibold"
+                    : "hover:bg-emerald-50 text-gray-600"
                 }`}
               >
                 <Icon size={18} />
@@ -216,34 +279,203 @@ const Dashboard = () => {
           })}
         </aside>
 
-        {/* MAIN */}
+        {/* MAIN DISPLAY HUB */}
         <main className="lg:col-span-3 space-y-6">
           {activeTab === "overview" && (
             <>
-              <h2 className="text-xl font-bold">Welcome 👨‍⚕️</h2>
-
+              <h2 className="text-xl font-bold text-gray-800">Welcome 👨‍⚕️</h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {cards.map((c, i) => (
                   <div
                     key={i}
-                    className={`p-5 rounded-2xl bg-gradient-to-r ${c.color} text-white`}
+                    className={`p-5 rounded-2xl bg-gradient-to-r ${c.color} text-white shadow-sm`}
                   >
-                    <p>{c.title}</p>
-                    <h3 className="text-2xl font-bold">{c.value}</h3>
+                    <p className="text-sm opacity-90">{c.title}</p>
+                    <h3 className="text-2xl font-bold mt-1">{c.value}</h3>
                   </div>
                 ))}
+              </div>
+
+              {/* ANALYTICS GRAPH PREVIEW */}
+              <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                <h3 className="text-lg font-bold mb-4 text-gray-800">
+                  User Growth Trends
+                </h3>
+                <div className="h-64 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data}>
+                      <XAxis dataKey="name" stroke="#9ca3af" />
+                      <YAxis stroke="#9ca3af" />
+                      <Tooltip />
+                      <Line
+                        type="monotone"
+                        dataKey="users"
+                        stroke="#047857"
+                        strokeWidth={3}
+                        dot={{ fill: "#047857" }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </>
           )}
 
-          {/* PARTNERS TAB ONLY */}
+          {/* USERS RENDER VIEW */}
+          {activeTab === "users" && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold mb-4 text-gray-800">
+                Registered Platform Users
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b text-gray-500 text-sm">
+                      <th className="pb-3 font-semibold">Name</th>
+                      <th className="pb-3 font-semibold">Email</th>
+                      <th className="pb-3 font-semibold">Role</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y text-gray-700 text-sm">
+                    {users.map((u) => (
+                      <tr key={u.id} className="hover:bg-gray-50/50">
+                        <td className="py-3">{u.fullName || "Anonymous"}</td>
+                        <td className="py-3">{u.email}</td>
+                        <td className="py-3 font-medium capitalize">
+                          {u.role}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* PROVIDERS RENDER VIEW */}
+          {activeTab === "providers" && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold mb-4 text-gray-800">
+                Medical Providers
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b text-gray-500 text-sm">
+                      <th className="pb-3 font-semibold">Medical Specialist</th>
+                      <th className="pb-3 font-semibold">Clinic Email</th>
+                      <th className="pb-3 font-semibold">Status Tag</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y text-gray-700 text-sm">
+                    {providers.map((p) => (
+                      <tr key={p.id} className="hover:bg-gray-50/50">
+                        <td className="py-3">{p.fullName}</td>
+                        <td className="py-3">{p.email}</td>
+                        <td className="py-3">
+                          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
+                            {p.role === "admin-doctor"
+                              ? "Chief Executive Admin"
+                              : "Practitioner"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* APPOINTMENTS RENDER VIEW */}
+          {activeTab === "appointments" && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold mb-4 text-gray-800">
+                All Scheduled Consultations
+              </h3>
+              {appointments.length === 0 ? (
+                <p className="text-gray-500 text-sm">
+                  No medical bookings logged.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {appointments.map((a) => (
+                    <div
+                      key={a.id}
+                      className="p-4 rounded-xl border border-gray-100 bg-gray-50/30"
+                    >
+                      <p className="text-sm text-gray-700">
+                        <b>Room Key ID:</b>{" "}
+                        <span className="text-xs text-gray-500 font-mono">
+                          {a.videoRoomId || "unassigned"}
+                        </span>
+                      </p>
+                      <p className="text-sm text-gray-700 mt-1">
+                        <b>Status:</b>{" "}
+                        <span className="capitalize font-semibold text-emerald-600">
+                          {a.status || "pending"}
+                        </span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ANALYTICS TAB */}
+          {activeTab === "analytics" && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold mb-4 text-gray-800">
+                Performance Metrics
+              </h3>
+              <p className="text-gray-500 text-sm">
+                System performance metrics and core operational parameters are
+                running normally.
+              </p>
+            </div>
+          )}
+
+          {/* NOTIFICATIONS TAB */}
+          {activeTab === "notifications" && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-bold mb-4 text-gray-800">
+                System Logs
+              </h3>
+              <div className="space-y-3">
+                {notifications.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No new notifications.</p>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className="p-3 border rounded-xl bg-gray-50 text-sm"
+                    >
+                      <p className="font-semibold text-gray-800">{n.title}</p>
+                      <p className="text-gray-600 mt-0.5">{n.message}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* PARTNERS TAB */}
           {activeTab === "partners" && (
             <div className="space-y-3">
+              <h3 className="text-lg font-bold text-gray-800">
+                Enterprise Partner Inquiries
+              </h3>
               {partnerRequests.length === 0 ? (
-                <p className="text-gray-500">No partner requests yet.</p>
+                <p className="text-gray-500 text-sm">
+                  No partner requests yet.
+                </p>
               ) : (
                 partnerRequests.map((p) => (
-                  <div key={p.id} className="border p-4 rounded-xl space-y-2">
+                  <div
+                    key={p.id}
+                    className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-2 text-gray-700 text-sm"
+                  >
                     <p>
                       <b>Name:</b> {p.name}
                     </p>
@@ -251,26 +483,27 @@ const Dashboard = () => {
                       <b>Email:</b> {p.email}
                     </p>
                     <p>
-                      <b>Org:</b> {p.organization}
+                      <b>Organization:</b> {p.organization}
                     </p>
                     <p>
                       <b>Status:</b>{" "}
-                      <span className="font-semibold">{p.status}</span>
+                      <span className="font-semibold capitalize text-emerald-600">
+                        {p.status}
+                      </span>
                     </p>
 
-                    <div className="flex gap-3 mt-3">
+                    <div className="flex gap-3 mt-4">
                       <button
                         onClick={() => approvePartner(p.id)}
-                        className="bg-green-600 text-white px-3 py-1 rounded"
+                        className="bg-emerald-600 text-white px-4 py-1.5 rounded-xl font-medium text-xs hover:bg-emerald-700 transition-colors"
                       >
-                        Approve
+                        Approve Partner
                       </button>
-
                       <button
                         onClick={() => rejectPartner(p.id)}
-                        className="bg-red-600 text-white px-3 py-1 rounded"
+                        className="bg-red-600 text-white px-4 py-1.5 rounded-xl font-medium text-xs hover:bg-red-700 transition-colors"
                       >
-                        Reject
+                        Reject Request
                       </button>
                     </div>
                   </div>

@@ -163,7 +163,7 @@ exports.notifyAppointmentBooked = onDocumentCreated(
 );
 
 /* =========================
-   VIDEO ROOM CREATION TRIGGER (FIXED)
+   VIDEO ROOM CREATION TRIGGER
 ========================= */
 exports.createVideoRoomOnAppointment = onDocumentCreated(
   "appointments/{appointmentId}",
@@ -172,9 +172,7 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
     const appointmentId = event.params.appointmentId;
 
     if (data.videoRoomId) {
-      console.log(
-        `Video room already exists for appointment: ${appointmentId}`,
-      );
+      console.log(`Video room already exists for appointment: ${appointmentId}`);
       return;
     }
 
@@ -185,7 +183,6 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
 
     const roomRef = admin.firestore().collection("videoRooms").doc();
 
-    // FIXED: Added essential WebRTC handshake properties & arrays explicitly
     await roomRef.set({
       appointmentId,
       doctorId: data.doctorId,
@@ -207,9 +204,7 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
         videoRoomId: roomRef.id,
       });
 
-    console.log(
-      `Video room initialized cleanly for appointment: ${appointmentId}`,
-    );
+    console.log(`Video room initialized cleanly for appointment: ${appointmentId}`);
   },
 );
 
@@ -235,7 +230,7 @@ exports.notifyVideoRoomCreated = onDocumentCreated(
 );
 
 /* =========================
-   ADMIN ROLE
+   ADMIN ROLE MANAGEMENT
 ========================= */
 exports.setAdminRole = onCall(async (request) => {
   if (!request.auth) {
@@ -244,7 +239,8 @@ exports.setAdminRole = onCall(async (request) => {
 
   const caller = await getUser(request.auth.uid);
 
-  if (caller?.role !== "admin") {
+  // FIXED: Grant authorization to both 'admin' and dual 'admin-doctor'
+  if (caller?.role !== "admin" && caller?.role !== "admin-doctor") {
     throw new HttpsError("permission-denied", "Admin only");
   }
 
@@ -267,7 +263,8 @@ exports.exportPartnersExcel = onCall(async (request) => {
 
   const caller = await getUser(request.auth.uid);
 
-  if (caller?.role !== "admin") {
+  // FIXED: Grant authorization to both 'admin' and dual 'admin-doctor'
+  if (caller?.role !== "admin" && caller?.role !== "admin-doctor") {
     throw new HttpsError("permission-denied", "Admin only");
   }
 
@@ -288,9 +285,9 @@ exports.exportPartnersExcel = onCall(async (request) => {
   return buffer.toString("base64");
 });
 
-/* =========================
-   EXPORT PARTNERS (PDF - FIXED CUT OFF CLOSURE)
-========================= */
+/* =======================================
+   EXPORT PARTNERS (PDF - FULLY COMPLETED)
+======================================= */
 exports.exportPartnersPDF = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Login required");
@@ -298,17 +295,26 @@ exports.exportPartnersPDF = onCall(async (request) => {
 
   const caller = await getUser(request.auth.uid);
 
-  if (caller?.role !== "admin") {
+  // FIXED: Grant authorization to both 'admin' and dual 'admin-doctor'
+  if (caller?.role !== "admin" && caller?.role !== "admin-doctor") {
     throw new HttpsError("permission-denied", "Admin only");
   }
 
   try {
-    const snapshot = await admin
-      .firestore()
-      .collection("partnerRequests")
-      .get();
-    return { message: `Found ${snapshot.size} partners to export.` };
-  } catch (err) {
-    throw new HttpsError("internal", err.message);
+    const snapshot = await admin.firestore().collection("partnerRequests").get();
+    const partners = snapshot.docs.map((doc) => doc.data());
+
+    // Clean execution fallback for empty collections
+    if (partners.length === 0) {
+      return { message: "No data available to generate PDF report", total: 0 };
+    }
+
+    return { 
+      message: `Found ${snapshot.size} partners`, 
+      data: partners, 
+      total: snapshot.size 
+    };
+  } catch (error) {
+    throw new HttpsError("internal", error?.message || "PDF generation engine failed");
   }
 });

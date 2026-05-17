@@ -8,8 +8,29 @@ const Navbar = ({ user }) => {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
+  // DYNAMIC ROLE-BASED DASHBOARD LINK GENERATOR
+  const cachedRole = localStorage.getItem("userRole");
+
+  const getDashboardPath = () => {
+    if (cachedRole === "admin-doctor" || cachedRole === "admin") {
+      return "/admin-dashboard";
+    }
+    if (cachedRole === "doctor") {
+      return "/doctor-dashboard";
+    }
+    return "/patient-dashboard";
+  };
+
+  const getDashboardLabel = () => {
+    if (cachedRole === "admin-doctor") return "Admin-Doctor Hub";
+    if (cachedRole === "admin") return "Admin Dashboard";
+    if (cachedRole === "doctor") return "Doctor Dashboard";
+    return "Patient Dashboard";
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
+    localStorage.clear(); // Clear cached role strings on exit
     navigate("/login");
   };
 
@@ -39,9 +60,19 @@ const Navbar = ({ user }) => {
               <li>
                 <Link to="/contact">Contact</Link>
               </li>
-              <li>
-                <Link to="/admin-dashboard">Admin Dashboard</Link>
-              </li>
+
+              {/* FIXED DYNAMIC DASHBOARD LINKS */}
+              {user && (
+                <li>
+                  <Link
+                    to={getDashboardPath()}
+                    className="text-emerald-600 font-semibold"
+                  >
+                    {getDashboardLabel()}
+                  </Link>
+                </li>
+              )}
+
               <li>
                 <Link to="/ai-symptoms-checker">AI Checker</Link>
               </li>
@@ -94,12 +125,33 @@ const Navbar = ({ user }) => {
         {open && (
           <div className="md:hidden pb-4">
             <nav className="flex flex-col gap-3 text-gray-600 text-sm mt-3">
-              <Link to="/">Home</Link>
-              <Link to="/services">Services</Link>
-              <Link to="/history">History</Link>
-              <Link to="/contact">Contact</Link>
-              <Link to="/admin-dashboard">Admin Dashboard</Link>
-              <Link to="/ai-symptoms-checker">AI Checker</Link>
+              <Link to="/" onClick={() => setOpen(false)}>
+                Home
+              </Link>
+              <Link to="/services" onClick={() => setOpen(false)}>
+                Services
+              </Link>
+              <Link to="/history" onClick={() => setOpen(false)}>
+                History
+              </Link>
+              <Link to="/contact" onClick={() => setOpen(false)}>
+                Contact
+              </Link>
+
+              {/* FIXED MOBILE DYNAMIC LINK */}
+              {user && (
+                <Link
+                  to={getDashboardPath()}
+                  onClick={() => setOpen(false)}
+                  className="text-emerald-600 font-semibold"
+                >
+                  {getDashboardLabel()}
+                </Link>
+              )}
+
+              <Link to="/ai-symptoms-checker" onClick={() => setOpen(false)}>
+                AI Checker
+              </Link>
 
               <hr className="my-2" />
 
@@ -110,8 +162,11 @@ const Navbar = ({ user }) => {
                   </span>
 
                   <button
-                    onClick={handleLogout}
-                    className="bg-red-600 text-white px-3 py-2 rounded-md"
+                    onClick={() => {
+                      handleLogout();
+                      setOpen(false);
+                    }}
+                    className="bg-red-600 text-white px-3 py-2 rounded-md mt-1"
                   >
                     Logout
                   </button>
@@ -120,6 +175,7 @@ const Navbar = ({ user }) => {
                 <div className="flex gap-3 mt-3">
                   <Link
                     to="/login"
+                    onClick={() => setOpen(false)}
                     className="bg-green-700 text-white px-3 py-2 rounded-md"
                   >
                     Login
@@ -127,6 +183,7 @@ const Navbar = ({ user }) => {
 
                   <Link
                     to="/signup"
+                    onClick={() => setOpen(false)}
                     className="bg-gray-100 px-3 py-2 rounded-md"
                   >
                     Sign Up

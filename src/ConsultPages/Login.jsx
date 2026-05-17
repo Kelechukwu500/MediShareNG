@@ -56,22 +56,24 @@ const Login = () => {
       const userData = snap.data();
       await updateDoc(userRef, { verified: true });
 
-      // Save user profile attributes to local cache safely
+      // 1. Force state synchronization before running client navigation changes
       localStorage.setItem("userId", user.uid);
       localStorage.setItem("userRole", userData.role);
 
       /* ========================================================
-         ROLE-BASED REDIRECT (SUPPORTING THE DUAL ADMIN ACCOUNT)
+         ROLE-BASED REDIRECT WITH STATE-WRITING PROTECTION ASYNC
       ======================================================== */
-      if (userData.role === "admin" || userData.role === "admin-doctor") {
-        navigate("/admin-dashboard");
-      } else if (userData.role === "doctor") {
-        navigate("/doctor-dashboard");
-      } else if (userData.role === "patient") {
-        navigate("/patient-dashboard");
-      } else {
-        navigate("/");
-      }
+      setTimeout(() => {
+        if (userData.role === "admin" || userData.role === "admin-doctor") {
+          navigate("/admin-dashboard", { replace: true });
+        } else if (userData.role === "doctor") {
+          navigate("/doctor-dashboard", { replace: true });
+        } else if (userData.role === "patient") {
+          navigate("/patient-dashboard", { replace: true });
+        } else {
+          navigate("/", { replace: true });
+        }
+      }, 100); // 100ms macro-task delay ensures localStorage is accessible inside ProtectedRoute
     } catch (error) {
       console.error("LOGIN ERROR:", error);
       switch (error.code) {
@@ -83,7 +85,6 @@ const Login = () => {
         default:
           alert(error.message);
       }
-    } finally {
       setLoading(false);
     }
   };
@@ -133,7 +134,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="mt-8 w-full h-14 rounded-2xl bg-gradient-to-r from-[#065f46] to-[#2bb673] text-white font-bold flex items-center justify-center gap-3"
+              className="mt-8 w-full h-14 rounded-2xl bg-gradient-to-r from-[#065f46] to-[#2bb673] text-white font-bold flex items-center justify-center gap-3 disabled:opacity-70"
             >
               {loading ? "Verifying..." : "Login"}{" "}
               {!loading && <ArrowRight size={20} />}
