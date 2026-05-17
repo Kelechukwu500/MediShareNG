@@ -16,6 +16,8 @@ const VideoCall = () => {
   const [roomData, setRoomData] = useState(null);
   const [waiting, setWaiting] = useState(false);
   const [userId, setUserId] = useState(null);
+
+  // Safely detect roles from localStorage or fall back to URL query parameters if present
   const [userRole, setUserRole] = useState(
     () => localStorage.getItem("userRole") || "patient",
   );
@@ -34,11 +36,25 @@ const VideoCall = () => {
     return () => unsubscribe();
   }, [navigate]);
 
-  const { localStream, remoteStream } = useWebRTC(
-    roomId,
-    userId,
-    userRole === "doctor",
-  );
+  // Determine if this user is the Caller.
+  // In your setup, the Doctor initiates the WebRTC offer pipeline.
+  const isCaller = userRole === "doctor" || userRole === "Doctor";
+
+  const { localStream, remoteStream } = useWebRTC(roomId, userId, isCaller);
+
+  // Bind the local camera stream to the local DOM layout player
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  // Bind the remote peer stream to the remote DOM layout player
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
 
   useEffect(() => {
     if (!roomId || !userId) return;
@@ -68,6 +84,7 @@ const VideoCall = () => {
 
         setAuthorized(true);
 
+        // FIXED: Force room activation when Doctor connects so handshake fields instantiate
         if (isDoctor && !data.active) {
           setWaiting(false);
           setLoading(false);
@@ -100,70 +117,139 @@ const VideoCall = () => {
     return () => unsub();
   }, [roomId, userId, navigate]);
 
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      if (localVideoRef.current.srcObject !== localStream) {
-        localVideoRef.current.srcObject = localStream;
-      }
+  const handleEndCall = async () => {
+    if (!roomId) return;
+    try {
+      const roomRef = doc(db, "videoRooms", roomId);
+      await updateDoc(roomRef, { active: false, callEnded: true });
+      navigate("/");
+    } catch (err) {
+      console.error("Error terminating call:", err);
+      navigate("/");
     }
-  }, [localStream]);
-
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      if (remoteVideoRef.current.srcObject !== remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
-    }
-  }, [remoteStream]);
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white text-lg font-medium tracking-wide">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-          <span>Connecting to secure video channel...</span>
-        </div>
+      <div
+        style={{
+          padding: "40px",
+          textAlign: "center",
+          color: "#fff",
+          background: "#121212",
+          height: "100vh",
+        }}
+      >
+        Establishing secure server handshake configurations...
+      </div>
+    );
+  }
+
+  if (!authorized) {
+    return (
+      <div style={{ padding: "40px", textAlign: "center", color: "red" }}>
+        Unauthorized Access.
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 p-4 font-sans antialiased">
-      <div className="max-w-7xl mx-auto flex justify-between items-center text-white mb-4 bg-gray-900/50 backdrop-blur px-6 py-4 rounded-2xl border border-gray-800">
-        <div>
-          <h2 className="text-lg font-bold text-gray-100">
-            Live Medical Consultation
-          </h2>
-          <p className="text-xs text-green-400 font-medium flex items-center gap-1 mt-0.5">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
-            Secure Encrypted Session
-          </p>
-        </div>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        background: "#1a1a1a",
+        color: "#fff",
+        fontFamily: "sans-serif",
+      }}
+    >
+      <header
+        style={{
+          padding: "15px 20px",
+          background: "#2a2a2a",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <h2>Telemedicine Room ({userRole.toUpperCase()})</h2>
         <button
-          onClick={() =>
-            navigate(
-              userRole === "doctor"
-                ? "/doctor-dashboard"
-                : "/patient-dashboard",
-            )
-          }
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg"
+          onClick={handleEndCall}
+          style={{
+            background: "#dc3545",
+            color: "#fff",
+            border: "none",
+            padding: "10px 20px",
+            borderRadius: "5px",
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
         >
-          End Session
+          End Call
         </button>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-130px)]">
-        {/* Remote View */}
-        <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl flex items-center justify-center">
+      <div
+        style={{
+          flex: 1,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "20px",
+          padding: "20px",
+          boxSizing: "border-box",
+          background: "#121212",
+        }}
+      >
+        {/* Local Stream (Your Feed) */}
+        <div
+          style={{
+            position: "relative",
+            background: "#000",
+            borderRadius: "10px",
+            overflow: "hidden",
+          }}
+        >
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted // Local stream is muted to prevent audio feedback screeching from your own speakers
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+          <span
+            style={{
+              position: "absolute",
+              bottom: "15px",
+              left: "15px",
+              background: "rgba(0,0,0,0.6)",
+              padding: "5px 10px",
+              borderRadius: "4px",
+            }}
+          >
+            You ({userRole})
+          </span>
+        </div>
+
+        {/* Remote Stream (Peer Feed) */}
+        <div
+          style={{
+            position: "relative",
+            background: "#000",
+            borderRadius: "10px",
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           {waiting ? (
-            <div className="text-center px-4">
-              <h3 className="text-xl font-bold mb-1 text-white">
-                Waiting for Connection...
-              </h3>
-              <p className="text-gray-400 text-sm max-w-xs leading-relaxed">
-                The session will begin automatically when the other participant
-                arrives.
+            <div
+              style={{ textAlign: "center", color: "#aaa", padding: "20px" }}
+            >
+              <p>
+                Room initialized. Waiting for peer participant to join
+                network...
               </p>
             </div>
           ) : (
@@ -171,26 +257,22 @@ const VideoCall = () => {
               ref={remoteVideoRef}
               autoPlay
               playsInline
-              className="w-full h-full object-cover"
+              // FIXED: Unmuted so doctor and patient hear each other clearly over WebRTC channels
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           )}
-          <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase z-20">
-            {userRole === "doctor" ? "Patient Feed" : "Doctor Feed"}
-          </div>
-        </div>
-
-        {/* Local View */}
-        <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl">
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover transform scale-x-[-1]"
-          />
-          <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase">
-            You (Your Camera)
-          </div>
+          <span
+            style={{
+              position: "absolute",
+              bottom: "15px",
+              left: "15px",
+              background: "rgba(0,0,0,0.6)",
+              padding: "5px 10px",
+              borderRadius: "4px",
+            }}
+          >
+            {isCaller ? "Patient Feed" : "Doctor Feed"}
+          </span>
         </div>
       </div>
     </div>
