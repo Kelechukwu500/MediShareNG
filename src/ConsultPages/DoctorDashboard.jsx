@@ -8,6 +8,7 @@ import {
   where,
   orderBy,
   updateDoc,
+  setDoc, // ✅ Added for setting exact video room documents
   doc,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
@@ -43,36 +44,14 @@ const DoctorDashboard = () => {
     return () => window.removeEventListener("storage", checkActiveCacheSession);
   }, [navigate]);
 
-  /* =========================
-     AUTH GUARD
-  ========================== */
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
-        Loading doctor profile...
-      </div>
-    );
-  }
-
-  if (!doctor || !cachedUserId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-red-600 font-bold bg-gray-50">
-        Please login again
-      </div>
-    );
-  }
-
-  const doctorId = doctor.uid;
-
   /* ========================================================
      REAL-TIME ROLE-AWARE APPOINTMENTS LISTENER
   ======================================================== */
   useEffect(() => {
-    if (!doctorId) return;
+    if (!doctor?.uid) return;
 
     let appointmentsQuery;
 
-    // Adjust the internal query layout filter to prevent Firestore rules from throwing an access exception
     if (cachedRole === "admin-doctor" || cachedRole === "admin") {
       console.log(
         "📡 Admin-Doctor detected: Registering un-filtered appointments collection observer.",
@@ -84,11 +63,11 @@ const DoctorDashboard = () => {
     } else {
       console.log(
         "📡 Standard Doctor detected: Filtering queries strictly matching id:",
-        doctorId,
+        doctor.uid,
       );
       appointmentsQuery = query(
         collection(db, "appointments"),
-        where("doctorId", "==", doctorId),
+        where("doctorId", "==", doctor.uid),
         orderBy("createdAt", "desc"),
       );
     }
@@ -101,7 +80,6 @@ const DoctorDashboard = () => {
           ...d.data(),
         }));
 
-        // Show toast notification only for true incoming requests
         if (
           data.length > previousCountRef.current &&
           previousCountRef.current !== 0
@@ -121,18 +99,45 @@ const DoctorDashboard = () => {
     );
 
     return () => unsub();
-  }, [doctorId, cachedRole]);
+  }, [doctor, cachedRole]);
 
   /* =========================
      APPROVE / REJECT
   ========================== */
-  const approveAppointment = async (id) => {
+  const approveAppointment = async (appointmentItem) => {
     try {
-      await updateDoc(doc(db, "appointments", id), { status: "approved" });
-      toast.success("Appointment approved");
+      const appointmentRef = doc(db, "appointments", appointmentItem.id);
+
+      // ✅ AUTOMATED P2P SIGNAL ROOM INITIALIZATION SYSTEM
+      // Use the appointment id as a unique video room key if one does not exist
+      const computedRoomId =
+        appointmentItem.videoRoomId || `room-${appointmentItem.id}`;
+      const videoRoomRef = doc(db, "videoRooms", computedRoomId);
+
+      // Create the structural signaling document inside Firestore
+      await setDoc(
+        videoRoomRef,
+        {
+          roomId: computedRoomId,
+          doctorId: appointmentItem.doctorId || doctor.uid,
+          patientId: appointmentItem.patientId || "",
+          active: false,
+          callStarted: false,
+          createdAt: new Date(),
+        },
+        { merge: true },
+      );
+
+      // Link the room back to the appointment document status map
+      await updateDoc(appointmentRef, {
+        status: "approved",
+        videoRoomId: computedRoomId,
+      });
+
+      toast.success("Appointment approved & signaling room active!");
     } catch (err) {
-      console.error(err);
-      toast.error("Failed to approve");
+      console.error("Approval flow encounter error:", err);
+      toast.error("Failed to approve appointment parameters");
     }
   };
 
@@ -152,11 +157,30 @@ const DoctorDashboard = () => {
       return;
     }
     if (!appointment.videoRoomId) {
-      toast.error("No video room found");
+      toast.error("No video room found. Try re-approving.");
       return;
     }
     navigate(`/video-call/${appointment.videoRoomId}`);
   };
+
+  /* =========================
+     AUTH RENDERING GUARD
+  ========================== */
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
+        Loading doctor profile...
+      </div>
+    );
+  }
+
+  if (!doctor || !cachedUserId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-red-600 font-bold bg-gray-50">
+        Please login again
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-start">
@@ -214,7 +238,7 @@ const DoctorDashboard = () => {
                               : "text-amber-600"
                         }`}
                       >
-                        {a.status}
+                        {a.status || "pending"}
                       </span>
                     </p>
                     {a.createdAt && (
@@ -228,30 +252,32 @@ const DoctorDashboard = () => {
                   </div>
 
                   <div className="flex gap-2">
-                    {a.status === "pending" && (
+                    {a.status === "pending" || !a.status ? (
                       <>
                         <button
-                          onClick={() => approveAppointment(a.id)}
+                          onClick={() => approveAppointment(a)} // ✅ Updated to pass whole item map
                           className="bg-green-600 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-green-700 transition-colors shadow-sm"
                         >
                           Approve
                         </button>
                         <button
                           onClick={() => rejectAppointment(a.id)}
-                          className="bg-red-600 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-red-700 transition-colors shadow-sm"
+                          className="bg-red-50 text-red-600 px-5 py-2 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors"
                         >
                           Reject
                         </button>
                       </>
-                    )}
-
-                    {a.status === "approved" && (
+                    ) : a.status === "approved" ? (
                       <button
                         onClick={() => joinRoom(a)}
                         className="bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm"
                       >
-                        Join Session
+                        Join Consultation Call
                       </button>
+                    ) : (
+                      <span className="text-xs text-gray-400 font-semibold italic p-2">
+                        Session Terminated
+                      </span>
                     )}
                   </div>
                 </div>
