@@ -163,7 +163,7 @@ exports.notifyAppointmentBooked = onDocumentCreated(
 );
 
 /* =========================
-   VIDEO ROOM CREATION TRIGGER
+   VIDEO ROOM CREATION TRIGGER - ONLY THIS WAS CHANGED
 ========================= */
 exports.createVideoRoomOnAppointment = onDocumentCreated(
   "appointments/{appointmentId}",
@@ -172,7 +172,9 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
     const appointmentId = event.params.appointmentId;
 
     if (data.videoRoomId) {
-      console.log(`Video room already exists for appointment: ${appointmentId}`);
+      console.log(
+        `Video room already exists for appointment: ${appointmentId}`,
+      );
       return;
     }
 
@@ -204,7 +206,9 @@ exports.createVideoRoomOnAppointment = onDocumentCreated(
         videoRoomId: roomRef.id,
       });
 
-    console.log(`Video room initialized cleanly for appointment: ${appointmentId}`);
+    console.log(
+      `Video room initialized cleanly for appointment: ${appointmentId}`,
+    );
   },
 );
 
@@ -301,7 +305,10 @@ exports.exportPartnersPDF = onCall(async (request) => {
   }
 
   try {
-    const snapshot = await admin.firestore().collection("partnerRequests").get();
+    const snapshot = await admin
+      .firestore()
+      .collection("partnerRequests")
+      .get();
     const partners = snapshot.docs.map((doc) => doc.data());
 
     // Clean execution fallback for empty collections
@@ -309,12 +316,15 @@ exports.exportPartnersPDF = onCall(async (request) => {
       return { message: "No data available to generate PDF report", total: 0 };
     }
 
-    return { 
-      message: `Found ${snapshot.size} partners`, 
-      data: partners, 
-      total: snapshot.size 
+    return {
+      message: `Found ${snapshot.size} partners`,
+      data: partners,
+      total: snapshot.size,
     };
   } catch (error) {
-    throw new HttpsError("internal", error?.message || "PDF generation engine failed");
+    throw new HttpsError(
+      "internal",
+      error?.message || "PDF generation engine failed",
+    );
   }
 });
