@@ -16,6 +16,8 @@ import {
   X,
   Handshake,
   ArrowRight,
+  FlaskConical,
+  Pill,
 } from "lucide-react";
 
 import {
@@ -33,7 +35,7 @@ const Dashboard = () => {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
-  // FIXED: Standardize state checks locally to bypass race conditions with custom tracking hooks
+  // Standardize state checks locally to bypass race conditions with custom tracking hooks
   const cachedRole = localStorage.getItem("userRole");
   const cachedUserId = localStorage.getItem("userId");
 
@@ -45,6 +47,10 @@ const Dashboard = () => {
   const [appointments, setAppointments] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [partnerRequests, setPartnerRequests] = useState([]);
+
+  // NEW STREAM STORAGE STATES
+  const [labBookings, setLabBookings] = useState([]);
+  const [pharmacyOrders, setPharmacyOrders] = useState([]);
 
   const data = [
     { name: "Mon", users: 400 },
@@ -72,11 +78,14 @@ const Dashboard = () => {
     },
   ];
 
+  // EXPANDED MENU DEFINITIONS
   const menuItems = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
     { key: "users", label: "Users", icon: Users },
     { key: "providers", label: "Providers", icon: Hospital },
     { key: "appointments", label: "Appointments", icon: Calendar },
+    { key: "labBookings", label: "Lab Bookings", icon: FlaskConical },
+    { key: "pharmacyOrders", label: "Pharmacy Orders", icon: Pill },
     { key: "analytics", label: "Analytics", icon: BarChart3 },
     { key: "notifications", label: "Notifications", icon: Bell },
     { key: "partners", label: "Partner Requests", icon: Handshake },
@@ -88,19 +97,16 @@ const Dashboard = () => {
       const activeId = localStorage.getItem("userId");
       const activeRole = localStorage.getItem("userRole");
 
-      // If local storage is wiped while viewing the page, kick them to login immediately
       if (!activeId || !activeRole) {
         navigate("/login", { replace: true });
       }
     };
 
-    // Listen to cross-tab modifications automatically
     window.addEventListener("storage", checkActiveCacheSession);
     return () => window.removeEventListener("storage", checkActiveCacheSession);
   }, [navigate]);
 
   useEffect(() => {
-    // Prevent non-admins from registering listening pipes entirely
     if (!isAdminAuthorized) return;
 
     const unsubUsers = onSnapshot(
@@ -108,10 +114,9 @@ const Dashboard = () => {
       (snap) => {
         setUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
       },
-      (err) => console.error("Users query tracking error:", err.message),
+      (err) => console.error("Users query error:", err.message),
     );
 
-    // CLEAN SNAPSHOT WRAPPER FOR PRIVILEGED USERS ONLY
     const unsubProviders = onSnapshot(
       collection(db, "users"),
       (snap) => {
@@ -120,7 +125,7 @@ const Dashboard = () => {
           .filter((u) => u.role === "doctor" || u.role === "admin-doctor");
         setProviders(filteredProviders);
       },
-      (err) => console.error("Providers query tracking error:", err.message),
+      (err) => console.error("Providers query error:", err.message),
     );
 
     const unsubAppointments = onSnapshot(
@@ -130,7 +135,7 @@ const Dashboard = () => {
           snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
         );
       },
-      (err) => console.error("Appointments query tracking error:", err.message),
+      (err) => console.error("Appointments query error:", err.message),
     );
 
     const unsubNotifications = onSnapshot(
@@ -140,8 +145,7 @@ const Dashboard = () => {
           snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
         );
       },
-      (err) =>
-        console.error("Notifications query tracking error:", err.message),
+      (err) => console.error("Notifications query error:", err.message),
     );
 
     const unsubPartners = onSnapshot(
@@ -151,8 +155,30 @@ const Dashboard = () => {
           snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
         );
       },
+      (err) => console.error("Partner requests query error:", err.message),
+    );
+
+    // NEW REAL-TIME SNAPSHOT LISTENER CHANNELS
+    const unsubLab = onSnapshot(
+      collection(db, "labBookings"),
+      (snap) => {
+        setLabBookings(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => console.error("Lab bookings snapshot track error:", err.message),
+    );
+
+    const unsubPharmacy = onSnapshot(
+      collection(db, "prescriptionOrders"),
+      (snap) => {
+        setPharmacyOrders(
+          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+        );
+      },
       (err) =>
-        console.error("Partner requests query tracking error:", err.message),
+        console.error(
+          "Pharmacy prescription orders snapshot track error:",
+          err.message,
+        ),
     );
 
     return () => {
@@ -161,8 +187,29 @@ const Dashboard = () => {
       unsubAppointments();
       unsubNotifications();
       unsubPartners();
+      unsubLab();
+      unsubPharmacy();
     };
   }, [isAdminAuthorized]);
+
+  // ACTION OPERATIONS FOR LABS & ORDERS
+  const updateLabStatus = async (id, nextStatus) => {
+    try {
+      await updateDoc(doc(db, "labBookings", id), { status: nextStatus });
+    } catch (err) {
+      console.error("Lab state write failure:", err);
+    }
+  };
+
+  const updatePharmacyOrderStatus = async (id, nextStatus) => {
+    try {
+      await updateDoc(doc(db, "prescriptionOrders", id), {
+        status: nextStatus,
+      });
+    } catch (err) {
+      console.error("Pharmacy status write failure:", err);
+    }
+  };
 
   const approvePartner = async (id) => {
     try {
@@ -193,7 +240,7 @@ const Dashboard = () => {
           <p className="text-red-500 font-bold text-xl mb-2">Access Denied</p>
           <p className="text-gray-600 text-sm">
             Your profile role ({cachedRole || "none"}) is not authorized to
-            access this administrative panel.
+            access this panel.
           </p>
         </div>
       </div>
@@ -306,7 +353,175 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* DYNAMIC PARTNER REQUESTS RENDER WORKSPACE */}
+          {/* DYNAMIC E-LABORATORY DISPATCH TAB */}
+          {activeTab === "labBookings" && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <div className="mb-5">
+                <h2 className="text-lg font-bold text-gray-800">
+                  E-Laboratory Appointment Slots
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Track and schedule user-requested laboratory diagnostic
+                  panels.
+                </p>
+              </div>
+
+              {labBookings.length === 0 ? (
+                <p className="text-sm text-gray-400 py-6 text-center">
+                  No active diagnostic testing requests found.
+                </p>
+              ) : (
+                <div className="overflow-x-auto border rounded-xl">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50 text-xs text-gray-600 border-b">
+                      <tr>
+                        <th className="p-3">Patient</th>
+                        <th className="p-3">Contact</th>
+                        <th className="p-3">Test Requested</th>
+                        <th className="p-3">Schedule Time</th>
+                        <th className="p-3">Notes</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y text-gray-700">
+                      {labBookings.map((lab) => (
+                        <tr key={lab.id} className="hover:bg-gray-50/50">
+                          <td className="p-3 font-bold text-gray-900">
+                            {lab.patientName}
+                          </td>
+                          <td className="p-3 font-mono text-xs">{lab.phone}</td>
+                          <td className="p-3">
+                            <span className="bg-emerald-50 text-emerald-800 text-xs px-2.5 py-1 rounded font-medium border border-emerald-100">
+                              {lab.testType}
+                            </span>
+                          </td>
+                          <td className="p-3 text-xs">
+                            {lab.appointmentDate}{" "}
+                            <span className="text-gray-400 font-mono">
+                              ({lab.appointmentTime})
+                            </span>
+                          </td>
+                          <td className="p-3 text-xs text-gray-500 max-w-xs truncate">
+                            {lab.additionalNotes || "None"}
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full font-bold ${lab.status === "Approved" ? "bg-green-100 text-green-700" : lab.status === "Cancelled" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}
+                            >
+                              {lab.status || "pending"}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right space-x-1 whitespace-nowrap">
+                            <button
+                              onClick={() =>
+                                updateLabStatus(lab.id, "Cancelled")
+                              }
+                              className="bg-red-50 text-red-600 px-2.5 py-1 rounded text-xs font-semibold hover:bg-red-100"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={() =>
+                                updateLabStatus(lab.id, "Approved")
+                              }
+                              className="bg-green-600 text-white px-2.5 py-1 rounded text-xs font-semibold hover:bg-green-700"
+                            >
+                              Approve
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* DYNAMIC E-PHARMACY ORDERS WORKSPACE */}
+          {activeTab === "pharmacyOrders" && (
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+              <div className="mb-5">
+                <h2 className="text-lg font-bold text-gray-800">
+                  E-Pharmacy Prescription Dispatches
+                </h2>
+                <p className="text-xs text-gray-500">
+                  Monitor incoming prescriptions, targets, and shipment
+                  logistics.
+                </p>
+              </div>
+
+              {pharmacyOrders.length === 0 ? (
+                <p className="text-sm text-gray-400 py-6 text-center">
+                  No script tracking submissions listed.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {pharmacyOrders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="border rounded-xl p-4 bg-gray-50/50 hover:bg-gray-50 transition-all flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                    >
+                      <div className="space-y-1 flex-1">
+                        <div className="flex items-center gap-3">
+                          <h4 className="font-bold text-gray-900 text-base">
+                            {order.patientName || "Anonymous Patient"}
+                          </h4>
+                          <span className="text-xs px-2 py-0.5 font-bold rounded bg-blue-50 text-blue-700 border border-blue-100">
+                            {order.pharmacy}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 font-semibold">
+                          Contact:{" "}
+                          <span className="font-mono font-normal">
+                            {order.phone}
+                          </span>
+                        </p>
+                        <div className="bg-white p-2.5 rounded border text-xs text-gray-700 mt-2 font-mono whitespace-pre-wrap">
+                          {order.medicine}
+                        </div>
+                        <p className="text-xs text-gray-500 pt-1">
+                          📍{" "}
+                          <span className="font-medium text-gray-700">
+                            Shipping To:
+                          </span>{" "}
+                          {order.deliveryAddress}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 justify-between">
+                        <span
+                          className={`text-xs px-2.5 py-1 rounded-full font-bold tracking-wide uppercase ${order.status === "Delivered" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}
+                        >
+                          {order.status || "In Transit"}
+                        </span>
+                        <div className="flex gap-1 mt-2">
+                          <button
+                            onClick={() =>
+                              updatePharmacyOrderStatus(order.id, "In Transit")
+                            }
+                            className="bg-amber-50 text-amber-700 border px-2.5 py-1 rounded text-xs font-semibold hover:bg-amber-100"
+                          >
+                            Hold
+                          </button>
+                          <button
+                            onClick={() =>
+                              updatePharmacyOrderStatus(order.id, "Delivered")
+                            }
+                            className="bg-emerald-600 text-white px-2.5 py-1 rounded text-xs font-semibold hover:bg-emerald-700"
+                          >
+                            Deliver
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PARTNER REQUESTS RENDER WORKSPACE */}
           {activeTab === "partners" && (
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
               <div className="mb-6">
@@ -330,7 +545,6 @@ const Dashboard = () => {
                       key={request.id}
                       className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 hover:bg-gray-50 transition-all shadow-sm"
                     >
-                      {/* HEADER SUMMARY BAR */}
                       <div className="flex flex-wrap justify-between items-start gap-4 mb-3">
                         <div>
                           <h3 className="font-bold text-gray-800 text-base">
@@ -342,20 +556,13 @@ const Dashboard = () => {
                         </div>
                         <div className="flex items-center gap-3">
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
-                              request.status === "approved"
-                                ? "bg-green-100 text-green-700"
-                                : request.status === "rejected"
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-amber-100 text-amber-700"
-                            }`}
+                            className={`px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${request.status === "approved" ? "bg-green-100 text-green-700" : request.status === "rejected" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}
                           >
                             {request.status || "pending"}
                           </span>
                         </div>
                       </div>
 
-                      {/* COMPREHENSIVE GRID OF ALL FORM DATA INPUT FIELDS */}
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2 text-xs border-t border-gray-100 pt-3 mt-2 text-gray-600">
                         <div>
                           <span className="font-semibold text-gray-500">
@@ -407,7 +614,6 @@ const Dashboard = () => {
                         </div>
                       </div>
 
-                      {/* USER STATEMENT MESSAGE BLOCK */}
                       <div className="bg-white p-3 rounded-lg border border-gray-100 mt-3 text-xs">
                         <p className="font-semibold text-gray-500 mb-1">
                           Applicant Message Statement:
@@ -418,7 +624,6 @@ const Dashboard = () => {
                         </p>
                       </div>
 
-                      {/* CONDITIONAL ACTION OPERATIONS SUBSECTION FOOTER */}
                       {request.status !== "approved" &&
                         request.status !== "rejected" && (
                           <div className="flex justify-end gap-2 mt-4 border-t border-gray-100 pt-3">
@@ -445,7 +650,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* MOBILE DROP MENU WRAPPER DRAWER PANEL CLOSE-STACK */}
+      {/* MOBILE DROP MENU WRAPPER DRAWER PANEL */}
       {open && (
         <div
           className="fixed inset-0 z-50 lg:hidden bg-black/40"

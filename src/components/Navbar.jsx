@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import medilogo3 from "../assets/medilogo3.jpg";
 import { Link, useNavigate } from "react-router-dom";
-import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 
 const Navbar = ({ user }) => {
@@ -29,34 +28,24 @@ const Navbar = ({ user }) => {
   };
 
   // IRONCLAD TIMEOUT-CLEARING LOGOUT TASK
-
-  
   const handleLogout = async () => {
     setOpen(false); // Close mobile menus instantly
 
     try {
-      // 1. Force clear memory arrays FIRST to break the internal React loop instantly
       localStorage.clear();
       sessionStorage.clear();
 
-      // 2. Clear out auth tokens straight from the core global module instance
       const { signOut: firebaseSignOut } = await import("firebase/auth");
       await firebaseSignOut(auth);
 
       console.log("🔒 Session destroyed safely.");
-
-      // 3. Overwrite history tracking maps so hitting 'Back' triggers a login check fallback
       navigate("/login", { replace: true });
-
-      // 4. Force a hard context window reload. This clears stale React memory hooks,
-      //    forcing useAuthState to re-initialize from scratch as null.
       window.location.href = "/login";
     } catch (error) {
       console.error(
         "Logout sequence encountered a fatal interruption:",
         error.message,
       );
-      // Fallback rescue if network connection breaks
       localStorage.clear();
       sessionStorage.clear();
       window.location.href = "/login";
@@ -76,13 +65,22 @@ const Navbar = ({ user }) => {
 
           {/* Desktop Menu */}
           <nav className="hidden md:block">
-            <ul className="flex items-center gap-6 text-sm text-gray-600">
+            <ul className="flex items-center gap-5 text-sm text-gray-600">
               <li>
                 <Link to="/">Home</Link>
               </li>
               <li>
                 <Link to="/services">Services</Link>
               </li>
+
+              {/* 🔓 UNLOCKED HEALTH SERVICE PIPELINES */}
+              <li className="font-medium text-emerald-600 hover:text-emerald-700">
+                <Link to="/e-laboratory">E-Laboratory</Link>
+              </li>
+              <li className="font-medium text-emerald-600 hover:text-emerald-700">
+                <Link to="/e-pharmacy">E-Pharmacy</Link>
+              </li>
+
               <li>
                 <Link to="/history">History</Link>
               </li>
@@ -95,7 +93,7 @@ const Navbar = ({ user }) => {
                 <li>
                   <Link
                     to={getDashboardPath()}
-                    className="text-emerald-600 font-semibold"
+                    className="text-emerald-700 font-bold"
                   >
                     {getDashboardLabel()}
                   </Link>
@@ -160,6 +158,23 @@ const Navbar = ({ user }) => {
               <Link to="/services" onClick={() => setOpen(false)}>
                 Services
               </Link>
+
+              {/* 🔓 UNLOCKED HEALTH SERVICE PIPELINES - MOBILE */}
+              <Link
+                to="/e-laboratory"
+                onClick={() => setOpen(false)}
+                className="text-emerald-600 font-medium"
+              >
+                E-Laboratory
+              </Link>
+              <Link
+                to="/e-pharmacy"
+                onClick={() => setOpen(false)}
+                className="text-emerald-600 font-medium"
+              >
+                E-Pharmacy
+              </Link>
+
               <Link to="/history" onClick={() => setOpen(false)}>
                 History
               </Link>
@@ -172,7 +187,7 @@ const Navbar = ({ user }) => {
                 <Link
                   to={getDashboardPath()}
                   onClick={() => setOpen(false)}
-                  className="text-emerald-600 font-semibold"
+                  className="text-emerald-700 font-bold"
                 >
                   {getDashboardLabel()}
                 </Link>
@@ -225,6 +240,6 @@ const Navbar = ({ user }) => {
       </div>
     </header>
   );
-};;;
+};
 
 export default Navbar;

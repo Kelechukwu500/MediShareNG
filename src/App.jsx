@@ -73,7 +73,6 @@ const ProtectedRoute = ({ children, allowedRoles, user }) => {
 
   useEffect(() => {
     const verifySessionSecurity = async () => {
-      // 1. ANCHOR SECURITY GUARD: If the core auth parameter drops, trigger an instant wipe
       if (!user) {
         localStorage.clear();
         sessionStorage.clear();
@@ -150,9 +149,12 @@ const App = () => {
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
 
+          {/* 🔓 UNLOCKED GUEST CHANNELS (Only Become a Partner remains completely public) */}
+          <Route path="/become-a-partner" element={<BecomeAPartner />} />
+
           {/* MASTER SECURITY INTERCEPT GATEWAY */}
           {!user ? (
-            /* IF FIREBASE SAYS UNVERIFIED/LOGGED OUT, FORCE DROP ALL APP PATHS ENTIRELY */
+            /* IF FIREBASE SAYS UNVERIFIED, REDIRECT STRANGERS TO LOGIN IMMEDATELY */
             <Route path="*" element={<Navigate to="/login" replace />} />
           ) : (
             /* ONLY MOUNT APPLICATION MAP IF AN AUTHENTICATED ACCOUNT EXISTS */
@@ -162,6 +164,234 @@ const App = () => {
               <Route path="/history" element={<History />} />
               <Route path="/services" element={<Services />} />
               <Route path="/contact" element={<Contact />} />
+
+              {/* 🔒 LOCKED SECURE HEALTH SERVICE PIPELINES */}
+              <Route
+                path="/e-pharmacy"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <DigitalPharmacy />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/digital-pharmacy" /* Added matching fallback route found on footer link */
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <DigitalPharmacy />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/e-laboratory"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <LaboratoryTests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/laboratory-tests" /* Added matching fallback route found on footer link */
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <LaboratoryTests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/lab-finder"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <LabFinder />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* 🔒 PROTECTED FOOTER PAGES (Moved inside the auth boundary) */}
+              <Route
+                path="/meet-our-board"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <MeetOurBoard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/online-consultation"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <OnlineConsultation />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/pricing-plans"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <PricingPlans />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/health-tips"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <HealthTips />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/blog"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <Blog />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/privacy"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <Privacy />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/terms"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <Terms />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/cookies"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <Cookies />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/faq"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={[
+                      "patient",
+                      "doctor",
+                      "admin",
+                      "admin-doctor",
+                    ]}
+                    user={user}
+                  >
+                    <FAQ />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* PROTECTED ROUTING MATRIX */}
               <Route
@@ -230,7 +460,6 @@ const App = () => {
                 }
               />
 
-              {/* UTILITY CORE PAGES */}
               <Route path="/view-specialists" element={<ViewSpecialists />} />
               <Route
                 path="/ai-symptoms-checker"
@@ -244,31 +473,13 @@ const App = () => {
                 path="/smart-health-records"
                 element={<SmartHealthRecords />}
               />
-              <Route path="/digital-pharmacy" element={<DigitalPharmacy />} />
               <Route
                 path="/certified-specialists"
                 element={<CertifiedSpecialists />}
               />
-              <Route path="/become-a-partner" element={<BecomeAPartner />} />
-
-              {/* INFORMATION & COMPLIANCE FOOTER VIEWS */}
-              <Route
-                path="/online-consultation"
-                element={<OnlineConsultation />}
-              />
               <Route path="/consultation-flow" element={<ConsultationFlow />} />
-              <Route path="/laboratory-tests" element={<LaboratoryTests />} />
-              <Route path="/lab-finder" element={<LabFinder />} />
-              <Route path="/pricing-plans" element={<PricingPlans />} />
-              <Route path="/health-tips" element={<HealthTips />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/faq" element={<FAQ />} />
-              <Route path="/cookies" element={<Cookies />} />
-              <Route path="/meet-our-board" element={<MeetOurBoard />} />
-              <Route path="/blog" element={<Blog />} />
 
-              {/* SYSTEM GUIDING PRINCIPLES */}
+              {/* CORE PRINCIPLE ROUTING */}
               <Route path="/accessibility" element={<Accessibility />} />
               <Route path="/transparency" element={<Transparency />} />
               <Route path="/efficiency" element={<Efficiency />} />
@@ -276,15 +487,7 @@ const App = () => {
               <Route path="/trust" element={<Trust />} />
               <Route path="/patient-centered" element={<PatientCentered />} />
 
-              {/* MEDIA BLOG ARCHIVE & REVIEWS */}
-              <Route path="/blog/technology" element={<TechnologyDetails />} />
-              <Route path="/blog/wellness" element={<WellnessDetails />} />
-              <Route path="/blog/nutrition" element={<NutritionDetails />} />
-              <Route path="/blog/healthcare" element={<HealthcareDetails />} />
-              <Route path="/blog/surgery" element={<SurgeryDetails />} />
-              <Route path="/blog/gadgets" element={<GadgetsDetails />} />
-
-              {/* FALLBACK REDIRECT */}
+              {/* RE-ROUTING WILDCARD CATCH FOR ACTIVE SESSIONS */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           )}

@@ -46,7 +46,7 @@ As Managing Director of MediShareNG, Dr. Ezema brings a unique blend of medical 
       title: "Executive Director",
       qualifications: "",
       icon: <FaUserTie className="text-xl" />,
-      badge: "ED",
+      badge: "Board Member",
       image: chairwoman,
       description: `
 Ngozi Ezema is a seasoned public health and development leader with over 20 years of progressive experience in program management, strategic operations, and health systems strengthening across Nigeria.
@@ -69,7 +69,7 @@ Beyond her professional achievements, she is deeply family-oriented. She is a de
       name: "Eyimoga Akwuludo James",
       title: "Chief Financial Officer",
       icon: <FaMoneyBillWave className="text-xl" />,
-      badge: "CFO",
+      badge: "Board Member",
       image: finance,
       description: `
 A highly experienced finance executive with strong expertise in healthcare financial systems, donor fund management, budgeting, compliance, and organizational sustainability.

@@ -78,7 +78,7 @@ const ConsultationFlow = () => {
                   onClick={handleStartFlow}
                   className="group bg-white text-[#065f46] hover:bg-[#d1fae5] transition-all duration-300 px-8 h-16 rounded-2xl font-bold text-lg shadow-xl flex items-center justify-center gap-3"
                 >
-                  Start Consultation Flow
+                  Start Consultation 
                   <ArrowRight
                     size={22}
                     className="group-hover:translate-x-1 transition-all duration-300"
