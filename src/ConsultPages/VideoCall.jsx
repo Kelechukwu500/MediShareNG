@@ -12,36 +12,27 @@ const VideoCall = () => {
   const remoteVideoRef = useRef(null);
 
   const [loading, setLoading] = useState(true);
-  const [authorized, setAuthorized] = useState(false);
-  const [roomData, setRoomData] = useState(null);
   const [waiting, setWaiting] = useState(false);
+  const [error, setError] = useState(null);
+  const [roomData, setRoomData] = useState(null);
   const [userId, setUserId] = useState(null);
-  const [userRole, setUserRole] = useState(
-    () => localStorage.getItem("userRole") || "patient",
-  );
 
+  const userRole = localStorage.getItem("userRole") || "patient";
+  const isHostCaller = ["doctor", "admin", "admin-doctor"].includes(userRole);
+
+  // Auth Check
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
       if (!user) {
         navigate("/login");
       } else {
         setUserId(user.uid);
-        if (localStorage.getItem("userRole")) {
-          setUserRole(localStorage.getItem("userRole"));
-        }
       }
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  // ✅ FIXED: Maps caller parameters correctly for strict P2P signalling handshake orchestration
-  const isHostCaller =
-    userRole === "doctor" ||
-    userRole === "admin" ||
-    userRole === "admin-doctor";
-
-  const { localStream, remoteStream } = useWebRTC(roomId, userId, isHostCaller);
-
+  // Room & Authorization Check
   useEffect(() => {
     if (!roomId || !userId) return;
 
@@ -51,62 +42,40 @@ const VideoCall = () => {
       roomRef,
       async (snap) => {
         if (!snap.exists()) {
-          alert("This video room no longer exists.");
-          navigate("/");
+          setError("This video room no longer exists.");
+          setLoading(false);
+          setTimeout(() => navigate("/"), 2500);
           return;
         }
 
         const data = snap.data();
         setRoomData(data);
 
-        // Check host state
         const isDoctor = data.doctorId === userId;
-
-        // ✅ FIXED: Authorizes patient if patientId matches OR if it's currently unassigned (allowing the joining patient to bind)
-        const isPatient = !data.patientId || data.patientId === userId;
+        const isPatient = data.patientId === userId || !data.patientId;
 
         if (!isDoctor && !isPatient) {
-          alert("You are not authorized to join this call.");
-          navigate("/");
+          setError("You are not authorized to join this session.");
+          setLoading(false);
+          setTimeout(() => navigate("/"), 2000);
           return;
         }
 
-        setAuthorized(true);
-
-        // ✅ FIXED: If the participant is the patient and the room doesn't have an ID attached yet, bind them permanently
+        // Bind patient ID if missing
         if (!isDoctor && !data.patientId) {
           try {
             await updateDoc(roomRef, { patientId: userId });
           } catch (err) {
-            console.error("Failed to bind patient payload metadata down:", err);
+            console.error("Failed to bind patient:", err);
           }
         }
 
-        if (isDoctor && !data.active) {
-          setWaiting(false);
-          setLoading(false);
-          try {
-            await updateDoc(roomRef, {
-              active: true,
-              callStarted: true,
-              startedAt: new Date(),
-            });
-          } catch (err) {
-            console.error("Failed to activate room:", err);
-          }
-          return;
-        }
-
-        if (!data.active) {
-          setWaiting(true);
-        } else {
-          setWaiting(false);
-        }
-
+        setWaiting(!data.active);
         setLoading(false);
       },
       (error) => {
-        console.error("Room Snapshot Error:", error);
+        console.error("Room snapshot error:", error);
+        setError("Failed to connect to video room.");
         setLoading(false);
       },
     );
@@ -114,25 +83,35 @@ const VideoCall = () => {
     return () => unsub();
   }, [roomId, userId, navigate]);
 
+  const { localStream, remoteStream } = useWebRTC(roomId, userId, isHostCaller);
+
+  // Attach streams
   useEffect(() => {
     if (localVideoRef.current && localStream) {
-      if (localVideoRef.current.srcObject !== localStream) {
-        localVideoRef.current.srcObject = localStream;
-      }
+      localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
 
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
-      if (remoteVideoRef.current.srcObject !== remoteStream) {
-        remoteVideoRef.current.srcObject = remoteStream;
-      }
+      remoteVideoRef.current.srcObject = remoteStream;
     }
   }, [remoteStream]);
 
-  if (loading) {
+  if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white text-lg font-medium tracking-wide">
+      <div className="min-h-screen bg-black flex items-center justify-center text-white">
+        <div className="text-center">
+          <h2 className="text-red-500 text-2xl mb-4">Access Denied</h2>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || !userId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white text-lg">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
           <span>Connecting to secure video channel...</span>
