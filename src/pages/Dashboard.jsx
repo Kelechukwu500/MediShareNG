@@ -82,6 +82,23 @@ const Dashboard = () => {
     { key: "partners", label: "Partner Requests", icon: Handshake },
   ];
 
+  // REAL-TIME SESSION WATCHER FOR ABSOLUTE LOGOUT PROTECTION
+  useEffect(() => {
+    const checkActiveCacheSession = () => {
+      const activeId = localStorage.getItem("userId");
+      const activeRole = localStorage.getItem("userRole");
+
+      // If local storage is wiped while viewing the page, kick them to login immediately
+      if (!activeId || !activeRole) {
+        navigate("/login", { replace: true });
+      }
+    };
+
+    // Listen to cross-tab modifications automatically
+    window.addEventListener("storage", checkActiveCacheSession);
+    return () => window.removeEventListener("storage", checkActiveCacheSession);
+  }, [navigate]);
+
   useEffect(() => {
     // Prevent non-admins from registering listening pipes entirely
     if (!isAdminAuthorized) return;

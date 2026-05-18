@@ -28,10 +28,39 @@ const Navbar = ({ user }) => {
     return "Patient Dashboard";
   };
 
+  // IRONCLAD TIMEOUT-CLEARING LOGOUT TASK
+
+  
   const handleLogout = async () => {
-    await signOut(auth);
-    localStorage.clear(); // Clear cached role strings on exit
-    navigate("/login");
+    setOpen(false); // Close mobile menus instantly
+
+    try {
+      // 1. Force clear memory arrays FIRST to break the internal React loop instantly
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // 2. Clear out auth tokens straight from the core global module instance
+      const { signOut: firebaseSignOut } = await import("firebase/auth");
+      await firebaseSignOut(auth);
+
+      console.log("🔒 Session destroyed safely.");
+
+      // 3. Overwrite history tracking maps so hitting 'Back' triggers a login check fallback
+      navigate("/login", { replace: true });
+
+      // 4. Force a hard context window reload. This clears stale React memory hooks,
+      //    forcing useAuthState to re-initialize from scratch as null.
+      window.location.href = "/login";
+    } catch (error) {
+      console.error(
+        "Logout sequence encountered a fatal interruption:",
+        error.message,
+      );
+      // Fallback rescue if network connection breaks
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = "/login";
+    }
   };
 
   return (
@@ -196,6 +225,6 @@ const Navbar = ({ user }) => {
       </div>
     </header>
   );
-};
+};;;
 
 export default Navbar;

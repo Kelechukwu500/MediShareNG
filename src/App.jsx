@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
@@ -45,7 +45,8 @@ import PatientDashboard from "./ConsultPages/PatientDashboard";
 
 // FIREBASE
 import { useAuthState } from "react-firebase-hooks/auth";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 // PRINCIPLES
 import Accessibility from "./Principles/Accessibility";
@@ -63,18 +64,59 @@ import GadgetsDetails from "./BlogDetails/GadgetsDetails";
 import TechnologyDetails from "./BlogDetails/Technology Details";
 import WellnessDetails from "./BlogDetails/WellnessDetails";
 
-// ROBUST DUAL-ROLE ROUTE PROTECTION LAYER
+// ASYNCHRONOUS SECURE ROUTE PROTECTION LAYER
 const ProtectedRoute = ({ children, allowedRoles, user }) => {
-  const token = localStorage.getItem("userId") || user?.uid;
-  const role = localStorage.getItem("userRole");
+  const [currentRole, setCurrentRole] = useState(
+    localStorage.getItem("userRole"),
+  );
+  const [checkingRole, setCheckingRole] = useState(true);
 
-  if (!token) {
+  useEffect(() => {
+    const verifySessionSecurity = async () => {
+      // 1. ANCHOR SECURITY GUARD: If the core auth parameter drops, trigger an instant wipe
+      if (!user) {
+        localStorage.clear();
+        sessionStorage.clear();
+        setCurrentRole(null);
+        setCheckingRole(false);
+        return;
+      }
+
+      if (user && !localStorage.getItem("userRole")) {
+        try {
+          const docSnap = await getDoc(doc(db, "users", user.uid));
+          if (docSnap.exists()) {
+            const role = docSnap.data().role;
+            localStorage.setItem("userId", user.uid);
+            localStorage.setItem("userRole", role);
+            setCurrentRole(role);
+          }
+        } catch (err) {
+          console.error("Failed to re-sync user permission metadata:", err);
+        }
+      } else {
+        setCurrentRole(localStorage.getItem("userRole"));
+      }
+      setCheckingRole(false);
+    };
+
+    verifySessionSecurity();
+  }, [user]);
+
+  if (checkingRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-10 h-10 border-4 border-[#2bb673] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!user || !localStorage.getItem("userId")) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(role)) {
-    // Cross-channel bypass: Allow 'admin-doctor' to pass validation checks for doctor views
-    if (role === "admin-doctor" && allowedRoles.includes("doctor")) {
+  if (allowedRoles && !allowedRoles.includes(currentRole)) {
+    if (currentRole === "admin-doctor" && allowedRoles.includes("doctor")) {
       return children;
     }
     return <Navigate to="/" replace />;
@@ -104,133 +146,148 @@ const App = () => {
       <Navbar user={user} />
       <main className="flex-grow">
         <Routes>
-          {/* ALWAYS PUBLIC VISIBLE VIEWS */}
+          {/* ALWAYS PUBLIC VISIBLE AUTH CHANNELS */}
           <Route path="/signup" element={<Signup />} />
           <Route path="/login" element={<Login />} />
 
-          {/* APPLICATION MAIN PAGES */}
-          <Route path="/" element={<Home />} />
-          <Route path="/history" element={<History />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/contact" element={<Contact />} />
+          {/* MASTER SECURITY INTERCEPT GATEWAY */}
+          {!user ? (
+            /* IF FIREBASE SAYS UNVERIFIED/LOGGED OUT, FORCE DROP ALL APP PATHS ENTIRELY */
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          ) : (
+            /* ONLY MOUNT APPLICATION MAP IF AN AUTHENTICATED ACCOUNT EXISTS */
+            <>
+              {/* APPLICATION MAIN PAGES */}
+              <Route path="/" element={<Home />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/contact" element={<Contact />} />
 
-          {/* PROTECTED ROUTING MATRIX (Role verified & synced across Firebase instances) */}
-          <Route
-            path="/doctors-page"
-            element={
-              <ProtectedRoute
-                allowedRoles={["patient", "doctor", "admin-doctor"]}
-                user={user}
-              >
-                <DoctorsPage />
-              </ProtectedRoute>
-            }
-          />
+              {/* PROTECTED ROUTING MATRIX */}
+              <Route
+                path="/doctors-page"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["patient", "doctor", "admin-doctor"]}
+                    user={user}
+                  >
+                    <DoctorsPage />
+                  </ProtectedRoute>
+                }
+              />
 
-          <Route
-            path="/book-consultation/:id"
-            element={
-              <ProtectedRoute allowedRoles={["patient"]} user={user}>
-                <BookConsultation />
-              </ProtectedRoute>
-            }
-          />
+              <Route
+                path="/book-consultation/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["patient"]} user={user}>
+                    <BookConsultation />
+                  </ProtectedRoute>
+                }
+              />
 
-          <Route
-            path="/doctor-dashboard"
-            element={
-              <ProtectedRoute
-                allowedRoles={["doctor", "admin-doctor"]}
-                user={user}
-              >
-                <DoctorDashboard />
-              </ProtectedRoute>
-            }
-          />
+              <Route
+                path="/doctor-dashboard"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["doctor", "admin-doctor"]}
+                    user={user}
+                  >
+                    <DoctorDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-          <Route
-            path="/video-call/:roomId"
-            element={
-              <ProtectedRoute
-                allowedRoles={["doctor", "patient", "admin-doctor"]}
-                user={user}
-              >
-                <VideoCall />
-              </ProtectedRoute>
-            }
-          />
+              <Route
+                path="/video-call/:roomId"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["doctor", "patient", "admin-doctor"]}
+                    user={user}
+                  >
+                    <VideoCall />
+                  </ProtectedRoute>
+                }
+              />
 
-          <Route
-            path="/patient-dashboard"
-            element={
-              <ProtectedRoute allowedRoles={["patient"]} user={user}>
-                <PatientDashboard />
-              </ProtectedRoute>
-            }
-          />
+              <Route
+                path="/patient-dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={["patient"]} user={user}>
+                    <PatientDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-          <Route
-            path="/admin-dashboard"
-            element={
-              <ProtectedRoute
-                allowedRoles={["admin", "admin-doctor"]}
-                user={user}
-              >
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
+              <Route
+                path="/admin-dashboard"
+                element={
+                  <ProtectedRoute
+                    allowedRoles={["admin", "admin-doctor"]}
+                    user={user}
+                  >
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-          {/* UTILITY CORE PAGES */}
-          <Route path="/view-specialists" element={<ViewSpecialists />} />
-          <Route path="/ai-symptoms-checker" element={<AISymptomsChecker />} />
-          <Route
-            path="/connected-diagnostics"
-            element={<ConnectedDiagnostics />}
-          />
-          <Route
-            path="/smart-health-records"
-            element={<SmartHealthRecords />}
-          />
-          <Route path="/digital-pharmacy" element={<DigitalPharmacy />} />
-          <Route
-            path="/certified-specialists"
-            element={<CertifiedSpecialists />}
-          />
-          <Route path="/become-a-partner" element={<BecomeAPartner />} />
+              {/* UTILITY CORE PAGES */}
+              <Route path="/view-specialists" element={<ViewSpecialists />} />
+              <Route
+                path="/ai-symptoms-checker"
+                element={<AISymptomsChecker />}
+              />
+              <Route
+                path="/connected-diagnostics"
+                element={<ConnectedDiagnostics />}
+              />
+              <Route
+                path="/smart-health-records"
+                element={<SmartHealthRecords />}
+              />
+              <Route path="/digital-pharmacy" element={<DigitalPharmacy />} />
+              <Route
+                path="/certified-specialists"
+                element={<CertifiedSpecialists />}
+              />
+              <Route path="/become-a-partner" element={<BecomeAPartner />} />
 
-          {/* INFORMATION & COMPLIANCE FOOTER VIEWS */}
-          <Route path="/online-consultation" element={<OnlineConsultation />} />
-          <Route path="/consultation-flow" element={<ConsultationFlow />} />
-          <Route path="/laboratory-tests" element={<LaboratoryTests />} />
-          <Route path="/lab-finder" element={<LabFinder />} />
-          <Route path="/pricing-plans" element={<PricingPlans />} />
-          <Route path="/health-tips" element={<HealthTips />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/faq" element={<FAQ />} />
-          <Route path="/cookies" element={<Cookies />} />
-          <Route path="/meet-our-board" element={<MeetOurBoard />} />
+              {/* INFORMATION & COMPLIANCE FOOTER VIEWS */}
+              <Route
+                path="/online-consultation"
+                element={<OnlineConsultation />}
+              />
+              <Route path="/consultation-flow" element={<ConsultationFlow />} />
+              <Route path="/laboratory-tests" element={<LaboratoryTests />} />
+              <Route path="/lab-finder" element={<LabFinder />} />
+              <Route path="/pricing-plans" element={<PricingPlans />} />
+              <Route path="/health-tips" element={<HealthTips />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="/cookies" element={<Cookies />} />
+              <Route path="/meet-our-board" element={<MeetOurBoard />} />
+              <Route path="/blog" element={<Blog />} />
 
-          {/* SYSTEM GUIDING PRINCIPLES */}
-          <Route path="/accessibility" element={<Accessibility />} />
-          <Route path="/transparency" element={<Transparency />} />
-          <Route path="/efficiency" element={<Efficiency />} />
-          <Route path="/innovation" element={<Innovation />} />
-          <Route path="/trust" element={<Trust />} />
-          <Route path="/patient-centered" element={<PatientCentered />} />
+              {/* SYSTEM GUIDING PRINCIPLES */}
+              <Route path="/accessibility" element={<Accessibility />} />
+              <Route path="/transparency" element={<Transparency />} />
+              <Route path="/efficiency" element={<Efficiency />} />
+              <Route path="/innovation" element={<Innovation />} />
+              <Route path="/trust" element={<Trust />} />
+              <Route path="/patient-centered" element={<PatientCentered />} />
 
-          {/* MEDIA BLOG ARCHIVE & REVIEWS */}
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/blog/technology" element={<TechnologyDetails />} />
-          <Route path="/blog/wellness" element={<WellnessDetails />} />
-          <Route path="/blog/nutrition" element={<NutritionDetails />} />
-          <Route path="/blog/healthcare" element={<HealthcareDetails />} />
-          <Route path="/blog/surgery" element={<SurgeryDetails />} />
-          <Route path="/blog/gadgets" element={<GadgetsDetails />} />
+              {/* MEDIA BLOG ARCHIVE & REVIEWS */}
+              <Route path="/blog/technology" element={<TechnologyDetails />} />
+              <Route path="/blog/wellness" element={<WellnessDetails />} />
+              <Route path="/blog/nutrition" element={<NutritionDetails />} />
+              <Route path="/blog/healthcare" element={<HealthcareDetails />} />
+              <Route path="/blog/surgery" element={<SurgeryDetails />} />
+              <Route path="/blog/gadgets" element={<GadgetsDetails />} />
 
-          {/* FALLBACK SYSTEM */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+              {/* FALLBACK REDIRECT */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          )}
         </Routes>
       </main>
       <Footer />

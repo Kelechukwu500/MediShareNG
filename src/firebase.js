@@ -1,5 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+} from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 
@@ -12,20 +16,19 @@ const firebaseConfig = {
   appId: "1:1011449021082:web:0da40df5ace874f109d523",
 };
 
-// Initialize Firebase
+// Initialize Firebase Core Instance
 const app = initializeApp(firebaseConfig);
 
-// Services
-export const db = getFirestore(app);
+// 🔥 MODERN OFFLINE PERSISTENCE (Replaces the deprecated enableIndexedDbPersistence)
+// This enables secure offline snapshot tracking and keeps multi-tab queries in sync perfectly
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+});
+
 export const auth = getAuth(app);
 export const functions = getFunctions(app);
-
-// 🔥 ENABLE OFFLINE PERSISTENCE (VERY IMPORTANT FOR REALTIME APPS)
-try {
-  enableIndexedDbPersistence(db);
-} catch (err) {
-  console.warn("Firestore persistence not enabled:", err.code);
-}
 
 // Optional helper (recommended for your system consistency)
 export const getCurrentUserId = () => auth.currentUser?.uid;

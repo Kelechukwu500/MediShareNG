@@ -12,6 +12,7 @@ import {
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import toast, { Toaster } from "react-hot-toast";
+import { ArrowLeft } from "lucide-react";
 
 const DoctorDashboard = () => {
   const [appointments, setAppointments] = useState([]);
@@ -21,87 +22,106 @@ const DoctorDashboard = () => {
   const navigate = useNavigate();
   const [doctor, loading] = useAuthState(auth);
 
+  // CACHED SESSION PARAMETERS
+  const cachedRole = localStorage.getItem("userRole");
+  const cachedUserId = localStorage.getItem("userId");
+
+  /* ========================================================
+     REAL-TIME CROSS-TAB SECURITY OBSERVER (IMMEDIATE LOGOUT)
+  ======================================================== */
+  useEffect(() => {
+    const checkActiveCacheSession = () => {
+      const activeId = localStorage.getItem("userId");
+      const activeRole = localStorage.getItem("userRole");
+
+      if (!activeId || !activeRole) {
+        navigate("/login", { replace: true });
+      }
+    };
+
+    window.addEventListener("storage", checkActiveCacheSession);
+    return () => window.removeEventListener("storage", checkActiveCacheSession);
+  }, [navigate]);
+
   /* =========================
      AUTH GUARD
   ========================== */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-600">
         Loading doctor profile...
       </div>
     );
   }
 
-  if (!doctor) {
+  if (!doctor || !cachedUserId) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-red-600">
+      <div className="min-h-screen flex items-center justify-center text-red-600 font-bold bg-gray-50">
         Please login again
       </div>
     );
   }
 
-  /* =========================
-     DOCTOR ID (Critical)
-  ========================== */
-  const doctorId = doctor?.uid || doctor?.doctorId;
+  const doctorId = doctor.uid;
 
-  console.log("🔍 Doctor Logged In:", {
-    uid: doctor?.uid,
-    doctorId: doctor?.doctorId,
-    email: doctor?.email,
-    fullObject: doctor,
-  });
-
-  if (!doctorId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-red-600">
-        Doctor ID not found. Please login again.
-      </div>
-    );
-  }
-
-  
-  /* =========================
-   REAL-TIME APPOINTMENTS - IMPROVED
-========================== */
+  /* ========================================================
+     REAL-TIME ROLE-AWARE APPOINTMENTS LISTENER
+  ======================================================== */
   useEffect(() => {
     if (!doctorId) return;
 
-    console.log("📡 Setting up query for doctorId:", doctorId);
+    let appointmentsQuery;
 
-    const q = query(
-      collection(db, "appointments"),
-      where("doctorId", "==", doctorId),
-      orderBy("createdAt", "desc"),
-    );
+    // Adjust the internal query layout filter to prevent Firestore rules from throwing an access exception
+    if (cachedRole === "admin-doctor" || cachedRole === "admin") {
+      console.log(
+        "📡 Admin-Doctor detected: Registering un-filtered appointments collection observer.",
+      );
+      appointmentsQuery = query(
+        collection(db, "appointments"),
+        orderBy("createdAt", "desc"),
+      );
+    } else {
+      console.log(
+        "📡 Standard Doctor detected: Filtering queries strictly matching id:",
+        doctorId,
+      );
+      appointmentsQuery = query(
+        collection(db, "appointments"),
+        where("doctorId", "==", doctorId),
+        orderBy("createdAt", "desc"),
+      );
+    }
 
     const unsub = onSnapshot(
-      q,
+      appointmentsQuery,
       (snap) => {
         const data = snap.docs.map((d) => ({
           id: d.id,
           ...d.data(),
         }));
 
-        console.log(`📊 Received ${snap.size} appointments:`, data);
-
-        // Show toast only for real new appointments
-        if (data.length > previousCountRef.current) {
+        // Show toast notification only for true incoming requests
+        if (
+          data.length > previousCountRef.current &&
+          previousCountRef.current !== 0
+        ) {
           toast.success("New consultation request received!");
         }
 
         previousCountRef.current = data.length;
         setAppointments(data);
-        setIsLoading(false); // Add this if you have isLoading state
+        setIsLoading(false);
       },
       (error) => {
-        console.error("Firestore Error:", error);
-        toast.error("Error loading appointments");
+        console.error("Critical Firestore Security Breach Blocked:", error);
+        toast.error("Access Denied or Database error loading records");
+        setIsLoading(false);
       },
     );
 
     return () => unsub();
-  }, [doctorId]);
+  }, [doctorId, cachedRole]);
 
   /* =========================
      APPROVE / REJECT
@@ -135,83 +155,113 @@ const DoctorDashboard = () => {
       toast.error("No video room found");
       return;
     }
-    navigate(`/videocall/${appointment.videoRoomId}`);
+    navigate(`/video-call/${appointment.videoRoomId}`);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-start">
       <Toaster />
 
-      <h1 className="text-3xl font-bold text-green-700 mb-6">
-        Doctor Dashboard
-      </h1>
+      {/* CROSS-PRIVILEGED RETURN NAVIGATION BANNER */}
+      {cachedRole === "admin-doctor" && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex justify-between items-center text-xs shadow-sm sticky top-0 z-50">
+          <span className="text-amber-800 font-semibold tracking-wide">
+            Logged in with Admin-Doctor Cross privileges.
+          </span>
+          <button
+            onClick={() => navigate("/admin-dashboard")}
+            className="flex items-center gap-1.5 bg-amber-600 text-white px-4 py-1.5 rounded-xl font-bold hover:bg-amber-700 transition-colors shadow-sm"
+          >
+            <ArrowLeft size={14} />
+            Back to Admin View
+          </button>
+        </div>
+      )}
 
-      <div className="bg-white p-6 rounded-xl shadow-md">
-        <h2 className="text-xl font-semibold mb-4">Incoming Appointments</h2>
+      <div className="p-6 max-w-7xl w-full mx-auto space-y-6">
+        <h1 className="text-3xl font-black text-green-700">Doctor Dashboard</h1>
 
-        {isLoading ? (
-          <p className="text-gray-500">Loading appointments...</p>
-        ) : appointments.length === 0 ? (
-          <p className="text-gray-500">No appointments yet</p>
-        ) : (
-          appointments.map((a) => (
-            <div
-              key={a.id}
-              className="border p-5 rounded-xl mb-4 hover:shadow-md transition-shadow"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="font-semibold text-lg">
-                    Patient: {a.patientName || "Unknown"}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Status:{" "}
-                    <span className="capitalize font-medium">{a.status}</span>
-                  </p>
-                  {a.createdAt && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Booked:{" "}
-                      {a.createdAt.toDate
-                        ? a.createdAt.toDate().toLocaleString()
-                        : "N/A"}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">
+            Incoming Appointments
+          </h2>
+
+          {isLoading ? (
+            <p className="text-gray-500 text-sm animate-pulse">
+              Loading scheduled consultations...
+            </p>
+          ) : appointments.length === 0 ? (
+            <p className="text-gray-500 text-sm">No appointments logged yet.</p>
+          ) : (
+            appointments.map((a) => (
+              <div
+                key={a.id}
+                className="border border-gray-100 p-5 rounded-2xl mb-4 bg-gray-50/20 hover:shadow-sm transition-all"
+              >
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div className="space-y-1 text-sm text-gray-700">
+                    <p className="font-bold text-base text-gray-900">
+                      Patient: {a.patientName || "Unknown"}
                     </p>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  {a.status === "pending" && (
-                    <>
-                      <button
-                        onClick={() => approveAppointment(a.id)}
-                        className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700"
+                    <p>
+                      Status:{" "}
+                      <span
+                        className={`capitalize font-semibold ${
+                          a.status === "approved"
+                            ? "text-green-600"
+                            : a.status === "rejected"
+                              ? "text-red-600"
+                              : "text-amber-600"
+                        }`}
                       >
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => rejectAppointment(a.id)}
-                        className="bg-red-600 text-white px-5 py-2 rounded-lg hover:bg-red-700"
-                      >
-                        Reject
-                      </button>
-                    </>
-                  )}
+                        {a.status}
+                      </span>
+                    </p>
+                    {a.createdAt && (
+                      <p className="text-xs text-gray-400">
+                        Booked:{" "}
+                        {a.createdAt.toDate
+                          ? a.createdAt.toDate().toLocaleString()
+                          : "N/A"}
+                      </p>
+                    )}
+                  </div>
 
-                  {a.status === "approved" && (
-                    <button
-                      onClick={() => joinRoom(a)}
-                      className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700"
-                    >
-                      Join Session
-                    </button>
-                  )}
+                  <div className="flex gap-2">
+                    {a.status === "pending" && (
+                      <>
+                        <button
+                          onClick={() => approveAppointment(a.id)}
+                          className="bg-green-600 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-green-700 transition-colors shadow-sm"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => rejectAppointment(a.id)}
+                          className="bg-red-600 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-red-700 transition-colors shadow-sm"
+                        >
+                          Reject
+                        </button>
+                      </>
+                    )}
+
+                    {a.status === "approved" && (
+                      <button
+                        onClick={() => joinRoom(a)}
+                        className="bg-blue-600 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors shadow-sm"
+                      >
+                        Join Session
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
-};;
+};
 
 export default DoctorDashboard;
