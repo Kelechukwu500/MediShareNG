@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import partner from "../assets/partner.jpg";
 
-import { db, auth } from "../firebase";
+import { db } from "../firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
 
 const BecomeAPartner = () => {
-  const [user, setUser] = useState(null);
-
   const [formData, setFormData] = useState({
     name: "",
     organization: "",
@@ -22,22 +19,12 @@ const BecomeAPartner = () => {
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsub();
-  }, []);
-
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (!user) {
-      alert("You must be logged in to become a partner.");
-      return;
-    }
 
     if (loading) return; // prevent double submit
 
@@ -53,9 +40,6 @@ const BecomeAPartner = () => {
         idType: formData.idType,
         idNumber: formData.idNumber,
         message: formData.message,
-
-        userId: user.uid,
-        email: user.email,
 
         // 🔥 NEW CONSISTENT SYSTEM FIELDS
         status: "pending",
@@ -99,14 +83,6 @@ const BecomeAPartner = () => {
 
         {/* FORM */}
         <div className="bg-white p-6 rounded-2xl shadow-lg">
-          {!user ? (
-            <p className="text-red-600 font-semibold">
-              Please login to submit partnership request
-            </p>
-          ) : (
-            <p className="text-green-600 mb-4">Logged in as: {user.email}</p>
-          )}
-
           {submitted && (
             <div className="bg-green-100 p-2 rounded mb-3 text-green-700">
               Request submitted successfully
@@ -196,7 +172,7 @@ const BecomeAPartner = () => {
 
             <button
               disabled={loading}
-              className="w-full bg-green-600 text-white p-3 rounded"
+              className="w-full bg-green-600 text-white p-3 rounded disabled:bg-gray-400"
             >
               {loading ? "Submitting..." : "Submit"}
             </button>
