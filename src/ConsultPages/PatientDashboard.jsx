@@ -27,7 +27,7 @@ const PatientDashboard = () => {
     const q = query(
       collection(db, "appointments"),
       where("patientId", "==", user.uid),
-      orderBy("createdAt", "desc"), // ← Important for realtime + sorting
+      orderBy("createdAt", "desc"),
     );
 
     const unsub = onSnapshot(
@@ -114,9 +114,13 @@ const PatientDashboard = () => {
               </div>
 
               <div>
-                {a.status === "approved" && a.videoRoomId ? (
+                {a.status === "approved" && (a.videoRoomId || a.roomId) ? (
                   <button
-                    onClick={() => navigate(`/videocall/${a.videoRoomId}`)}
+                    onClick={() => {
+                      const roomID = a.videoRoomId || a.roomId;
+                      console.log("🔗 Joining video room:", roomID);
+                      navigate(`/videocall/${roomID}`);
+                    }}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-medium"
                   >
                     Join Video Call
