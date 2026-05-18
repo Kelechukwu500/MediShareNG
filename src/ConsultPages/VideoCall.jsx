@@ -34,11 +34,13 @@ const VideoCall = () => {
     return () => unsubscribe();
   }, [navigate]);
 
-  const { localStream, remoteStream } = useWebRTC(
-    roomId,
-    userId,
-    userRole === "doctor",
-  );
+  // ✅ FIXED: Maps caller parameters correctly for strict P2P signalling handshake orchestration
+  const isHostCaller =
+    userRole === "doctor" ||
+    userRole === "admin" ||
+    userRole === "admin-doctor";
+
+  const { localStream, remoteStream } = useWebRTC(roomId, userId, isHostCaller);
 
   useEffect(() => {
     if (!roomId || !userId) return;
@@ -57,8 +59,11 @@ const VideoCall = () => {
         const data = snap.data();
         setRoomData(data);
 
+        // Check host state
         const isDoctor = data.doctorId === userId;
-        const isPatient = data.patientId === userId;
+
+        // ✅ FIXED: Authorizes patient if patientId matches OR if it's currently unassigned (allowing the joining patient to bind)
+        const isPatient = !data.patientId || data.patientId === userId;
 
         if (!isDoctor && !isPatient) {
           alert("You are not authorized to join this call.");
@@ -67,6 +72,15 @@ const VideoCall = () => {
         }
 
         setAuthorized(true);
+
+        // ✅ FIXED: If the participant is the patient and the room doesn't have an ID attached yet, bind them permanently
+        if (!isDoctor && !data.patientId) {
+          try {
+            await updateDoc(roomRef, { patientId: userId });
+          } catch (err) {
+            console.error("Failed to bind patient payload metadata down:", err);
+          }
+        }
 
         if (isDoctor && !data.active) {
           setWaiting(false);
@@ -141,11 +155,7 @@ const VideoCall = () => {
         </div>
         <button
           onClick={() =>
-            navigate(
-              userRole === "doctor"
-                ? "/doctor-dashboard"
-                : "/patient-dashboard",
-            )
+            navigate(isHostCaller ? "/doctor-dashboard" : "/patient-dashboard")
           }
           className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg"
         >
@@ -175,7 +185,7 @@ const VideoCall = () => {
             />
           )}
           <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase z-20">
-            {userRole === "doctor" ? "Patient Feed" : "Doctor Feed"}
+            {isHostCaller ? "Patient Feed" : "Doctor Feed"}
           </div>
         </div>
 
