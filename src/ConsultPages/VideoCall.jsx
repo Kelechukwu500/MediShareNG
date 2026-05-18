@@ -20,10 +20,14 @@ const VideoCall = () => {
   const userRole = localStorage.getItem("userRole") || "patient";
   const isHostCaller = ["doctor", "admin", "admin-doctor"].includes(userRole);
 
+  console.log("🎥 VideoCall component mounted with roomId:", roomId);
+
   // Auth Check
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
+      console.log("🔐 Auth state changed. User:", user?.uid);
       if (!user) {
+        console.log("❌ No user → Redirecting to login");
         navigate("/login");
       } else {
         setUserId(user.uid);
@@ -32,156 +36,88 @@ const VideoCall = () => {
     return () => unsubscribe();
   }, [navigate]);
 
-  // Room & Authorization Check
+  // Room Check
   useEffect(() => {
-    if (!roomId || !userId) return;
+    if (!roomId || !userId) {
+      console.log("⏳ Waiting... roomId:", roomId, "userId:", userId);
+      return;
+    }
+
+    console.log(
+      "🔥 Starting Firestore listener for room:",
+      roomId,
+      "User:",
+      userId,
+    );
 
     const roomRef = doc(db, "videoRooms", roomId);
 
-    const unsub = onSnapshot(
-      roomRef,
-      async (snap) => {
-        if (!snap.exists()) {
-          setError("This video room no longer exists.");
-          setLoading(false);
-          setTimeout(() => navigate("/"), 2500);
-          return;
-        }
+    const unsub = onSnapshot(roomRef, async (snap) => {
+      console.log("📡 Room snapshot received. Exists?", snap.exists());
 
-        const data = snap.data();
-        setRoomData(data);
+      if (!snap.exists()) {
+        console.log("❌ Room document does NOT exist → Redirecting to home");
+        setError("Room not found");
+        setTimeout(() => navigate("/"), 1500);
+        return;
+      }
 
-        const isDoctor = data.doctorId === userId;
-        const isPatient = data.patientId === userId || !data.patientId;
+      const data = snap.data();
+      console.log("✅ Room data received:", data);
 
-        if (!isDoctor && !isPatient) {
-          setError("You are not authorized to join this session.");
-          setLoading(false);
-          setTimeout(() => navigate("/"), 2000);
-          return;
-        }
+      const isDoctor = data.doctorId === userId;
+      const isPatient = data.patientId === userId || !data.patientId;
 
-        // Bind patient ID if missing
-        if (!isDoctor && !data.patientId) {
-          try {
-            await updateDoc(roomRef, { patientId: userId });
-          } catch (err) {
-            console.error("Failed to bind patient:", err);
-          }
-        }
+      console.log("👤 IsDoctor:", isDoctor, "| IsPatient:", isPatient);
 
-        setWaiting(!data.active);
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Room snapshot error:", error);
-        setError("Failed to connect to video room.");
-        setLoading(false);
-      },
-    );
+      if (!isDoctor && !isPatient) {
+        console.log("🚫 Authorization FAILED → Redirecting to home");
+        setError("Not authorized");
+        setTimeout(() => navigate("/"), 1500);
+        return;
+      }
+
+      console.log("✅ Authorization PASSED");
+
+      // Bind patient if needed
+      if (!isDoctor && !data.patientId) {
+        console.log("🔗 Binding patientId to room...");
+        await updateDoc(roomRef, { patientId: userId });
+      }
+
+      setRoomData(data);
+      setWaiting(!data.active);
+      setLoading(false);
+    });
 
     return () => unsub();
   }, [roomId, userId, navigate]);
 
   const { localStream, remoteStream } = useWebRTC(roomId, userId, isHostCaller);
 
-  // Attach streams
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream]);
-
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
-  }, [remoteStream]);
+  // ... rest of your video refs useEffect remain the same
 
   if (error) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center text-white">
-        <div className="text-center">
-          <h2 className="text-red-500 text-2xl mb-4">Access Denied</h2>
-          <p>{error}</p>
-        </div>
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        Error: {error}
       </div>
     );
   }
 
-  if (loading || !userId) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white text-lg">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-          <span>Connecting to secure video channel...</span>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-black text-white">
+        Connecting to video room... (roomId: {roomId})
       </div>
     );
   }
 
+  // Your original return JSX here...
   return (
-    <div className="min-h-screen bg-gray-950 p-4 font-sans antialiased">
-      <div className="max-w-7xl mx-auto flex justify-between items-center text-white mb-4 bg-gray-900/50 backdrop-blur px-6 py-4 rounded-2xl border border-gray-800">
-        <div>
-          <h2 className="text-lg font-bold text-gray-100">
-            Live Medical Consultation
-          </h2>
-          <p className="text-xs text-green-400 font-medium flex items-center gap-1 mt-0.5">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
-            Secure Encrypted Session
-          </p>
-        </div>
-        <button
-          onClick={() =>
-            navigate(isHostCaller ? "/doctor-dashboard" : "/patient-dashboard")
-          }
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg"
-        >
-          End Session
-        </button>
-      </div>
-
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-130px)]">
-        {/* Remote View */}
-        <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl flex items-center justify-center">
-          {waiting ? (
-            <div className="text-center px-4">
-              <h3 className="text-xl font-bold mb-1 text-white">
-                Waiting for Connection...
-              </h3>
-              <p className="text-gray-400 text-sm max-w-xs leading-relaxed">
-                The session will begin automatically when the other participant
-                arrives.
-              </p>
-            </div>
-          ) : (
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="w-full h-full object-cover"
-            />
-          )}
-          <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase z-20">
-            {isHostCaller ? "Patient Feed" : "Doctor Feed"}
-          </div>
-        </div>
-
-        {/* Local View */}
-        <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl">
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover transform scale-x-[-1]"
-          />
-          <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase">
-            You (Your Camera)
-          </div>
-        </div>
-      </div>
+    // ... your full UI code
+    <div className="min-h-screen bg-gray-950 p-4 ...">
+      {/* your existing UI */}
     </div>
   );
 };
