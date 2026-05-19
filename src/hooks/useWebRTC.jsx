@@ -10,20 +10,6 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-const servers = {
-  iceServers: [
-    {
-      urls: [
-        "stun:://google.com",
-        "stun:://google.com",
-        "stun:://google.com",
-        "stun:://google.com",
-      ],
-    },
-  ],
-  iceCandidatePoolSize: 10,
-};
-
 const useWebRTC = (roomId, userId, isCaller) => {
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -74,7 +60,22 @@ const useWebRTC = (roomId, userId, isCaller) => {
 
     const initializeCall = async () => {
       try {
-        // 1. Get Hardware media tracks first
+        // 1. Defined inline to isolate from extension caching and interceptors
+        const localIceConfiguration = {
+          iceServers: [
+            {
+              urls: [
+                "stun:://google.com",
+                "stun:://google.com",
+                "stun:://google.com",
+                "stun:://google.com",
+              ],
+            },
+          ],
+          iceCandidatePoolSize: 10,
+        };
+
+        // 2. Get Hardware media tracks first
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
@@ -82,14 +83,14 @@ const useWebRTC = (roomId, userId, isCaller) => {
         localStreamRef.current = stream;
         setLocalStream(stream);
 
-        // 2. Build RTCPeerConnection instance with valid servers
-        const pc = new RTCPeerConnection(servers);
+        // 3. Build RTCPeerConnection instance using local configuration scope
+        const pc = new RTCPeerConnection(localIceConfiguration);
         peerConnection.current = pc;
 
-        // 3. Attach Local media tracks immediately BEFORE sending descriptions
+        // 4. Attach Local media tracks immediately BEFORE sending descriptions
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-        // 4. Listen for Incoming Remote media tracks
+        // 5. Listen for Incoming Remote media tracks
         pc.ontrack = (event) => {
           if (event.streams && event.streams[0]) {
             remoteStreamRef.current = event.streams[0];
@@ -101,7 +102,7 @@ const useWebRTC = (roomId, userId, isCaller) => {
         const offerCandidatesCol = collection(roomRef, "offerCandidates");
         const answerCandidatesCol = collection(roomRef, "answerCandidates");
 
-        // 5. Gather and transmit internal ICE Candidates
+        // 6. Gather and transmit internal ICE Candidates
         pc.onicecandidate = async (event) => {
           if (event.candidate) {
             const candidateData = event.candidate.toJSON();
@@ -113,7 +114,7 @@ const useWebRTC = (roomId, userId, isCaller) => {
           }
         };
 
-        // 6. Execute SDP Offer/Answer Negotiation Cycle
+        // 7. Execute SDP Offer/Answer Negotiation Cycle
         if (isCaller) {
           // Caller Flow (Doctor)
           const offerDescription = await pc.createOffer();
