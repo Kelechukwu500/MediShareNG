@@ -160,7 +160,7 @@ const DoctorDashboard = () => {
       toast.error("No video room found. Try re-approving.");
       return;
     }
-    navigate(`/video-call/${appointment.videoRoomId}`);
+    navigate(`/videocall/${appointment.videoRoomId}`);
   };
 
   /* =========================
