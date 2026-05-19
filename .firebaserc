@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "medishareng-5a742"
-  }
+    "default": "medishareng-5a742",
+    "production": "medishareng-5a742"
+  },
+  "targets": {},
+  "etags": {}
 }
