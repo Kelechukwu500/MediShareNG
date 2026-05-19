@@ -61,12 +61,18 @@ const VideoCall = () => {
           return;
         }
 
-        // Bind patient ID if missing
-        if (!isDoctor && !data.patientId) {
-          try {
-            await updateDoc(roomRef, { patientId: userId });
-          } catch (err) {
-            console.error("Failed to bind patient:", err);
+        // Bind patient ID if missing and activate room signaling automatically
+        if (!isDoctor) {
+          const updates = {};
+          if (!data.patientId) updates.patientId = userId;
+          if (!data.active) updates.active = true;
+
+          if (Object.keys(updates).length > 0) {
+            try {
+              await updateDoc(roomRef, updates);
+            } catch (err) {
+              console.error("Failed to bind patient/activate:", err);
+            }
           }
         }
 
@@ -85,13 +91,14 @@ const VideoCall = () => {
 
   const { localStream, remoteStream } = useWebRTC(roomId, userId, isHostCaller);
 
-  // Attach streams
+  // Attach local streams
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
 
+  // Attach remote streams
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
@@ -145,24 +152,28 @@ const VideoCall = () => {
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-130px)]">
         {/* Remote View */}
         <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl flex items-center justify-center">
-          {waiting ? (
-            <div className="text-center px-4">
-              <h3 className="text-xl font-bold mb-1 text-white">
-                Waiting for Connection...
-              </h3>
-              <p className="text-gray-400 text-sm max-w-xs leading-relaxed">
-                The session will begin automatically when the other participant
-                arrives.
-              </p>
+          {/* Keep video rendered in DOM but change visibility class */}
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className={`w-full h-full object-cover ${waiting ? "hidden" : "block"}`}
+          />
+
+          {waiting && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 text-center px-4 z-10">
+              <div>
+                <h3 className="text-xl font-bold mb-1 text-white">
+                  Waiting for Connection...
+                </h3>
+                <p className="text-gray-400 text-sm max-w-xs leading-relaxed">
+                  The session will begin automatically when the other
+                  participant arrives.
+                </p>
+              </div>
             </div>
-          ) : (
-            <video
-              ref={remoteVideoRef}
-              autoPlay
-              playsInline
-              className="w-full h-full object-cover"
-            />
           )}
+
           <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase z-20">
             {isHostCaller ? "Patient Feed" : "Doctor Feed"}
           </div>

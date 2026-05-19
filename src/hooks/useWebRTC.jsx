@@ -3,7 +3,8 @@ import {
   doc,
   updateDoc,
   onSnapshot,
-  arrayUnion,
+  collection,
+  addDoc,
   getDoc,
   setDoc,
 } from "firebase/firestore";
@@ -11,10 +12,10 @@ import { db } from "../firebase";
 
 const servers = {
   iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-    { urls: "stun:stun2.l.google.com:19302" },
-    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:://google.com" },
+    { urls: "stun:://google.com" },
+    { urls: "stun:://google.com" },
+    { urls: "stun:://google.com" },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -46,6 +47,8 @@ const useWebRTC = (roomId, userId, isCaller) => {
     }
     processedCandidates.current.clear();
     iceCandidatesQueue.current = [];
+    setLocalStream(null);
+    setRemoteStream(null);
   }, []);
 
   const processQueuedCandidates = async () => {
@@ -65,21 +68,24 @@ const useWebRTC = (roomId, userId, isCaller) => {
   useEffect(() => {
     if (!roomId || !userId) return;
 
-    const startWebRTC = async () => {
+    const initializeCall = async () => {
       try {
-        const pc = new RTCPeerConnection(servers);
-        peerConnection.current = pc;
-
+        // 1. Get Hardware media tracks first
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
-          window: true,
         });
         localStreamRef.current = stream;
         setLocalStream(stream);
 
+        // 2. Build RTCPeerConnection instance
+        const pc = new RTCPeerConnection(servers);
+        peerConnection.current = pc;
+
+        // 3. Attach Local media tracks immediately BEFORE sending descriptions
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
+        // 4. Listen for Incoming Remote media tracks
         pc.ontrack = (event) => {
           if (event.streams && event.streams[0]) {
             remoteStreamRef.current = event.streams[0];
@@ -88,56 +94,63 @@ const useWebRTC = (roomId, userId, isCaller) => {
         };
 
         const roomRef = doc(db, "videoRooms", roomId);
+        const offerCandidatesCol = collection(roomRef, "offerCandidates");
+        const answerCandidatesCol = collection(roomRef, "answerCandidates");
 
+        // 5. Gather and transmit internal ICE Candidates
         pc.onicecandidate = async (event) => {
           if (event.candidate) {
-            const candidateType = isCaller
-              ? "callerCandidates"
-              : "calleeCandidates";
-            await updateDoc(roomRef, {
-              [candidateType]: arrayUnion(event.candidate.toJSON()),
-            });
+            const candidateData = event.candidate.toJSON();
+            if (isCaller) {
+              await addDoc(offerCandidatesCol, candidateData);
+            } else {
+              await addDoc(answerCandidatesCol, candidateData);
+            }
           }
         };
 
+        // 6. Execute SDP Offer/Answer Negotiation Cycle
         if (isCaller) {
+          // Caller Flow (Doctor)
           const offerDescription = await pc.createOffer();
           await pc.setLocalDescription(offerDescription);
 
-          await updateDoc(roomRef, {
-            offer: {
-              type: offerDescription.type,
-              sdp: offerDescription.sdp,
+          await setDoc(
+            roomRef,
+            {
+              offer: { type: offerDescription.type, sdp: offerDescription.sdp },
             },
-          });
+            { merge: true },
+          );
 
+          // Listen for Answer
           unsubscribeRef.current = onSnapshot(roomRef, async (snapshot) => {
             const data = snapshot.data();
-            if (!data) return;
-
-            if (data.answer && !pc.currentRemoteDescription) {
+            if (data?.answer && !pc.remoteDescription) {
               const answerDescription = new RTCSessionDescription(data.answer);
               await pc.setRemoteDescription(answerDescription);
               await processQueuedCandidates();
             }
+          });
 
-            if (data.calleeCandidates) {
-              data.calleeCandidates.forEach((candidate) => {
-                const candStr = JSON.stringify(candidate);
-                if (!processedCandidates.current.has(candStr)) {
-                  processedCandidates.current.add(candStr);
-                  if (pc.currentRemoteDescription) {
-                    pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(
-                      console.error,
-                    );
+          // Listen for Patient Candidates
+          onSnapshot(answerCandidatesCol, (snapshot) => {
+            snapshot.docChanges().forEach(async (change) => {
+              if (change.type === "added") {
+                const data = change.doc.data();
+                if (!processedCandidates.current.has(change.doc.id)) {
+                  processedCandidates.current.add(change.doc.id);
+                  if (pc.remoteDescription) {
+                    await pc.addIceCandidate(new RTCIceCandidate(data));
                   } else {
-                    iceCandidatesQueue.current.push(candidate);
+                    iceCandidatesQueue.current.push(data);
                   }
                 }
-              });
-            }
+              }
+            });
           });
         } else {
+          // Receiver Flow (Patient)
           const roomSnap = await getDoc(roomRef);
           const roomData = roomSnap.data();
 
@@ -154,37 +167,34 @@ const useWebRTC = (roomId, userId, isCaller) => {
                 sdp: answerDescription.sdp,
               },
             });
+            await processQueuedCandidates();
           }
 
-          unsubscribeRef.current = onSnapshot(roomRef, async (snapshot) => {
-            const data = snapshot.data();
-            if (!data) return;
-
-            if (data.callerCandidates) {
-              data.callerCandidates.forEach((candidate) => {
-                const candStr = JSON.stringify(candidate);
-                if (!processedCandidates.current.has(candStr)) {
-                  processedCandidates.current.add(candStr);
-                  if (pc.currentRemoteDescription) {
-                    pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(
-                      console.error,
-                    );
+          // Listen for Doctor Candidates
+          onSnapshot(offerCandidatesCol, (snapshot) => {
+            snapshot.docChanges().forEach(async (change) => {
+              if (change.type === "added") {
+                const data = change.doc.data();
+                if (!processedCandidates.current.has(change.doc.id)) {
+                  processedCandidates.current.add(change.doc.id);
+                  if (pc.remoteDescription) {
+                    await pc.addIceCandidate(new RTCIceCandidate(data));
                   } else {
-                    iceCandidatesQueue.current.push(candidate);
+                    iceCandidatesQueue.current.push(data);
                   }
                 }
-              });
-            }
+              }
+            });
           });
-          await processQueuedCandidates();
         }
       } catch (err) {
-        console.error("WebRTC initiation failed:", err);
+        console.error("Failed to initialize WebRTC connection:", err);
       }
     };
 
-    startWebRTC();
-    return cleanup;
+    initializeCall();
+
+    return () => cleanup();
   }, [roomId, userId, isCaller, cleanup]);
 
   return { localStream, remoteStream };
