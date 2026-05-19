@@ -12,10 +12,14 @@ import { db } from "../firebase";
 
 const servers = {
   iceServers: [
-    { urls: "stun:://google.com" },
-    { urls: "stun:://google.com" },
-    { urls: "stun:://google.com" },
-    { urls: "stun:://google.com" },
+    {
+      urls: [
+        "stun:://google.com",
+        "stun:://google.com",
+        "stun:://google.com",
+        "stun:://google.com",
+      ],
+    },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -78,7 +82,7 @@ const useWebRTC = (roomId, userId, isCaller) => {
         localStreamRef.current = stream;
         setLocalStream(stream);
 
-        // 2. Build RTCPeerConnection instance
+        // 2. Build RTCPeerConnection instance with valid servers
         const pc = new RTCPeerConnection(servers);
         peerConnection.current = pc;
 
