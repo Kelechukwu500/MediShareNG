@@ -428,7 +428,7 @@ const App = () => {
               />
 
               <Route
-                path="/video-call/:roomId"
+                path="/videocall/:roomId"
                 element={
                   <ProtectedRoute
                     allowedRoles={["doctor", "patient", "admin-doctor"]}

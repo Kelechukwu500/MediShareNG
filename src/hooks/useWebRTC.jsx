@@ -5,10 +5,10 @@ import {
   onSnapshot,
   arrayUnion,
   getDoc,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
-// ✅ Correct STUN Servers
 const servers = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
@@ -28,184 +28,164 @@ const useWebRTC = (roomId, userId, isCaller) => {
   const peerConnection = useRef(null);
   const unsubscribeRef = useRef(null);
   const processedCandidates = useRef(new Set());
-
   const iceCandidatesQueue = useRef([]);
 
-  // Cleanup function
   const cleanup = useCallback(() => {
     console.log("Cleaning up WebRTC session...");
-
     if (unsubscribeRef.current) {
       unsubscribeRef.current();
       unsubscribeRef.current = null;
     }
-
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;
     }
-
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
       localStreamRef.current = null;
     }
-
     processedCandidates.current.clear();
     iceCandidatesQueue.current = [];
   }, []);
 
-  // Main effect
-  useEffect(() => {
-    if (!roomId || !userId) return;
-
-    startWebRTC();
-
-    return cleanup;
-  }, [roomId, userId, isCaller, cleanup]); // Added isCaller to dependencies
-
   const processQueuedCandidates = async () => {
     if (!peerConnection.current?.remoteDescription) return;
-
     while (iceCandidatesQueue.current.length > 0) {
       const candidate = iceCandidatesQueue.current.shift();
       try {
         await peerConnection.current.addIceCandidate(
           new RTCIceCandidate(candidate),
         );
-        console.log("✅ Buffered ICE Candidate added");
-      } catch (err) {
-        console.warn("Failed to add buffered ICE candidate:", err);
+      } catch (e) {
+        console.error("Error adding queued ice candidate", e);
       }
     }
   };
 
-  const startWebRTC = async () => {
-    try {
-      // 1. Get User Media
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
+  useEffect(() => {
+    if (!roomId || !userId) return;
 
-      localStreamRef.current = stream;
-      setLocalStream(stream);
+    const startWebRTC = async () => {
+      try {
+        const pc = new RTCPeerConnection(servers);
+        peerConnection.current = pc;
 
-      // 2. Create Peer Connection
-      peerConnection.current = new RTCPeerConnection(servers);
-
-      stream.getTracks().forEach((track) => {
-        peerConnection.current.addTrack(track, stream);
-      });
-
-      // 3. Handle Remote Tracks
-      peerConnection.current.ontrack = (event) => {
-        console.log("📡 Remote stream received");
-        const stream = event.streams[0] || new MediaStream([event.track]);
-        remoteStreamRef.current = stream;
-        setRemoteStream(stream);
-      };
-
-      const roomRef = doc(db, "videoRooms", roomId);
-
-      // 4. ICE Candidates
-      peerConnection.current.onicecandidate = async (event) => {
-        if (!event.candidate) return;
-
-        try {
-          await updateDoc(roomRef, {
-            [isCaller ? "offerCandidates" : "answerCandidates"]: arrayUnion(
-              event.candidate.toJSON(),
-            ),
-          });
-        } catch (err) {
-          console.error("Failed to save ICE candidate:", err);
-        }
-      };
-
-      // 5. Initial Offer (Caller only)
-      const roomSnap = await getDoc(roomRef);
-      const roomData = roomSnap.data();
-
-      if (isCaller && roomData && !roomData.offer) {
-        console.log("Creating Offer...");
-        const offer = await peerConnection.current.createOffer();
-        await peerConnection.current.setLocalDescription(offer);
-
-        await updateDoc(roomRef, {
-          offer: offer.toJSON(),
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+          window: true,
         });
-      }
+        localStreamRef.current = stream;
+        setLocalStream(stream);
 
-      // 6. Listen for signaling changes
-      unsubscribeRef.current = onSnapshot(roomRef, async (snap) => {
-        const data = snap.data();
-        if (!data || !peerConnection.current) return;
+        stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-        // Handle Offer (Callee)
-        if (
-          data.offer &&
-          !isCaller &&
-          !peerConnection.current.currentRemoteDescription
-        ) {
-          console.log("Processing remote offer...");
-          await peerConnection.current.setRemoteDescription(
-            new RTCSessionDescription(data.offer),
-          );
+        pc.ontrack = (event) => {
+          if (event.streams && event.streams[0]) {
+            remoteStreamRef.current = event.streams[0];
+            setRemoteStream(event.streams[0]);
+          }
+        };
 
-          const answer = await peerConnection.current.createAnswer();
-          await peerConnection.current.setLocalDescription(answer);
+        const roomRef = doc(db, "videoRooms", roomId);
+
+        pc.onicecandidate = async (event) => {
+          if (event.candidate) {
+            const candidateType = isCaller
+              ? "callerCandidates"
+              : "calleeCandidates";
+            await updateDoc(roomRef, {
+              [candidateType]: arrayUnion(event.candidate.toJSON()),
+            });
+          }
+        };
+
+        if (isCaller) {
+          const offerDescription = await pc.createOffer();
+          await pc.setLocalDescription(offerDescription);
 
           await updateDoc(roomRef, {
-            answer: answer.toJSON(),
+            offer: {
+              type: offerDescription.type,
+              sdp: offerDescription.sdp,
+            },
           });
 
-          await processQueuedCandidates();
-        }
+          unsubscribeRef.current = onSnapshot(roomRef, async (snapshot) => {
+            const data = snapshot.data();
+            if (!data) return;
 
-        // Handle Answer (Caller)
-        if (
-          data.answer &&
-          isCaller &&
-          !peerConnection.current.currentRemoteDescription
-        ) {
-          console.log("Processing remote answer...");
-          await peerConnection.current.setRemoteDescription(
-            new RTCSessionDescription(data.answer),
-          );
-          await processQueuedCandidates();
-        }
-
-        // Handle ICE Candidates
-        const candidates = isCaller
-          ? data.answerCandidates
-          : data.offerCandidates;
-
-        if (candidates?.length) {
-          for (const candidate of candidates) {
-            const key = JSON.stringify(candidate);
-            if (processedCandidates.current.has(key)) continue;
-
-            processedCandidates.current.add(key);
-
-            if (!peerConnection.current.remoteDescription) {
-              iceCandidatesQueue.current.push(candidate);
-            } else {
-              try {
-                await peerConnection.current.addIceCandidate(
-                  new RTCIceCandidate(candidate),
-                );
-              } catch (err) {
-                console.warn("ICE candidate skipped:", err);
-              }
+            if (data.answer && !pc.currentRemoteDescription) {
+              const answerDescription = new RTCSessionDescription(data.answer);
+              await pc.setRemoteDescription(answerDescription);
+              await processQueuedCandidates();
             }
+
+            if (data.calleeCandidates) {
+              data.calleeCandidates.forEach((candidate) => {
+                const candStr = JSON.stringify(candidate);
+                if (!processedCandidates.current.has(candStr)) {
+                  processedCandidates.current.add(candStr);
+                  if (pc.currentRemoteDescription) {
+                    pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(
+                      console.error,
+                    );
+                  } else {
+                    iceCandidatesQueue.current.push(candidate);
+                  }
+                }
+              });
+            }
+          });
+        } else {
+          const roomSnap = await getDoc(roomRef);
+          const roomData = roomSnap.data();
+
+          if (roomData?.offer) {
+            await pc.setRemoteDescription(
+              new RTCSessionDescription(roomData.offer),
+            );
+            const answerDescription = await pc.createAnswer();
+            await pc.setLocalDescription(answerDescription);
+
+            await updateDoc(roomRef, {
+              answer: {
+                type: answerDescription.type,
+                sdp: answerDescription.sdp,
+              },
+            });
           }
+
+          unsubscribeRef.current = onSnapshot(roomRef, async (snapshot) => {
+            const data = snapshot.data();
+            if (!data) return;
+
+            if (data.callerCandidates) {
+              data.callerCandidates.forEach((candidate) => {
+                const candStr = JSON.stringify(candidate);
+                if (!processedCandidates.current.has(candStr)) {
+                  processedCandidates.current.add(candStr);
+                  if (pc.currentRemoteDescription) {
+                    pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(
+                      console.error,
+                    );
+                  } else {
+                    iceCandidatesQueue.current.push(candidate);
+                  }
+                }
+              });
+            }
+          });
+          await processQueuedCandidates();
         }
-      });
-    } catch (error) {
-      console.error("WebRTC Critical Failure:", error);
-      // You can add a toast or alert here if needed
-    }
-  };
+      } catch (err) {
+        console.error("WebRTC initiation failed:", err);
+      }
+    };
+
+    startWebRTC();
+    return cleanup;
+  }, [roomId, userId, isCaller, cleanup]);
 
   return { localStream, remoteStream };
 };

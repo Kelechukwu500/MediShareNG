@@ -85,7 +85,12 @@ const PatientDashboard = () => {
               className="bg-white p-6 rounded-xl shadow flex flex-col md:flex-row justify-between md:items-center gap-4"
             >
               <div>
-                <h2 className="font-bold text-lg">Dr. {a.doctorName}</h2>
+                {/* FIX: Prevents "Dr. Dr." by verifying if database name already starts with "Dr" */}
+                <h2 className="font-bold text-lg">
+                  {a.doctorName?.startsWith("Dr")
+                    ? a.doctorName
+                    : `Dr. ${a.doctorName}`}
+                </h2>
                 <p className="text-sm text-gray-500">{a.doctorSpecialty}</p>
 
                 <p className="mt-3">
