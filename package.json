@@ -4,17 +4,24 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"firebase emulators:start --only functions\" \"vite\"",
+    "dev:frontend": "vite",
+    "dev:emulator": "firebase emulators:start --only functions",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
+
+
   "dependencies": {
+    "@livekit/components-react": "^2.9.21",
+    "@livekit/components-styles": "^1.2.0",
     "@react-google-maps/api": "^2.20.8",
     "@tailwindcss/vite": "^4.2.4",
     "firebase": "^12.13.0",
     "framer-motion": "^12.38.0",
     "jspdf": "^4.2.1",
+    "livekit-client": "^2.19.0",
     "lucide-react": "^1.14.0",
     "openai": "^6.37.0",
     "react": "^19.2.5",
@@ -34,6 +41,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^9.2.1",
     "eslint": "^10.2.1",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",

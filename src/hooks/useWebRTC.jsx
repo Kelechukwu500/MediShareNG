@@ -60,20 +60,15 @@ const useWebRTC = (roomId, userId, isCaller) => {
 
     const initializeCall = async () => {
       try {
-        // 1. Defined inline to isolate from extension caching and interceptors
-        const localIceConfiguration = {
-          iceServers: [
-            {
-              urls: [
-                "stun:://google.com",
-                "stun:://google.com",
-                "stun:://google.com",
-                "stun:://google.com",
-              ],
-            },
-          ],
-          iceCandidatePoolSize: 10,
-        };
+        // FIXED STUN URL CONFIGURATION - NO TYPOS OR REPEATED COPIES
+       const localIceConfiguration = {
+         iceServers: [
+           {
+             urls: ["stun:stun.l.google.com:19302"],
+           },
+         ],
+         iceCandidatePoolSize: 10,
+       };
 
         // 2. Get Hardware media tracks first
         const stream = await navigator.mediaDevices.getUserMedia({

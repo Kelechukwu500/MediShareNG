@@ -1,199 +1,115 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { db, auth } from "../firebase";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
-import useWebRTC from "../hooks/useWebRTC";
+import { db, auth, functions } from "../firebase";
+import { doc, onSnapshot } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+
+import {
+  LiveKitRoom,
+  VideoConference,
+  RoomAudioRenderer,
+} from "@livekit/components-react";
+import "@livekit/components-styles";
+
+const generateLiveKitToken = httpsCallable(functions, "generateLiveKitToken");
 
 const VideoCall = () => {
   const { roomId } = useParams();
   const navigate = useNavigate();
 
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-
   const [loading, setLoading] = useState(true);
-  const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState(null);
-  const [roomData, setRoomData] = useState(null);
+  const [token, setToken] = useState(null);
+  const [livekitUrl, setLivekitUrl] = useState(null);
   const [userId, setUserId] = useState(null);
 
-  const userRole = localStorage.getItem("userRole") || "patient";
-  const isHostCaller = ["doctor", "admin", "admin-doctor"].includes(userRole);
+  const tokenFetched = useRef(false);
 
-  // Auth Check
+  // Auth
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (!user) {
-        navigate("/login");
-      } else {
-        setUserId(user.uid);
-      }
+      if (!user) navigate("/login");
+      else setUserId(user.uid);
     });
     return () => unsubscribe();
   }, [navigate]);
 
-  // Room & Authorization Check
+  // Token Generation
   useEffect(() => {
-    if (!roomId || !userId) return;
+    if (!roomId || !userId || tokenFetched.current) return;
 
-    const roomRef = doc(db, "videoRooms", roomId);
+    const fetchToken = async () => {
+      tokenFetched.current = true;
+      try {
+        console.log("🔄 Requesting token for room:", roomId);
 
-    const unsub = onSnapshot(
-      roomRef,
-      async (snap) => {
-        if (!snap.exists()) {
-          setError("This video room no longer exists.");
-          setLoading(false);
-          setTimeout(() => navigate("/"), 2500);
-          return;
+        const result = await generateLiveKitToken({
+          roomName: roomId,
+          participantName: userId,
+        });
+
+        console.log("✅ Token Response:", result.data);
+
+        if (result?.data?.token && result?.data?.url) {
+          setToken(result.data.token);
+          setLivekitUrl(result.data.url);
+        } else {
+          throw new Error("Missing token or URL in response");
         }
-
-        const data = snap.data();
-        setRoomData(data);
-
-        const isDoctor = data.doctorId === userId;
-        const isPatient = data.patientId === userId || !data.patientId;
-
-        if (!isDoctor && !isPatient) {
-          setError("You are not authorized to join this session.");
-          setLoading(false);
-          setTimeout(() => navigate("/"), 2000);
-          return;
-        }
-
-        // Bind patient ID if missing and activate room signaling automatically
-        if (!isDoctor) {
-          const updates = {};
-          if (!data.patientId) updates.patientId = userId;
-          if (!data.active) updates.active = true;
-
-          if (Object.keys(updates).length > 0) {
-            try {
-              await updateDoc(roomRef, updates);
-            } catch (err) {
-              console.error("Failed to bind patient/activate:", err);
-            }
-          }
-        }
-
-        setWaiting(!data.active);
+      } catch (err) {
+        console.error("❌ LiveKit token error:", err);
+        setError(err.message || "Failed to generate token");
+      } finally {
         setLoading(false);
-      },
-      (error) => {
-        console.error("Room snapshot error:", error);
-        setError("Failed to connect to video room.");
-        setLoading(false);
-      },
-    );
+      }
+    };
 
-    return () => unsub();
-  }, [roomId, userId, navigate]);
-
-  const { localStream, remoteStream } = useWebRTC(roomId, userId, isHostCaller);
-
-  // Attach local streams
-  useEffect(() => {
-    if (localVideoRef.current && localStream) {
-      localVideoRef.current.srcObject = localStream;
-    }
-  }, [localStream]);
-
-  // Attach remote streams
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
-    }
-  }, [remoteStream]);
+    fetchToken();
+  }, [roomId, userId]);
 
   if (error) {
     return (
+      <div className="min-h-screen bg-black flex items-center justify-center text-white p-4">
+        <div className="text-center max-w-md">
+          <h2 className="text-red-500 text-2xl mb-4">Error</h2>
+          <p className="mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 px-6 py-3 rounded-xl"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading || !token || !livekitUrl) {
+    return (
       <div className="min-h-screen bg-black flex items-center justify-center text-white">
         <div className="text-center">
-          <h2 className="text-red-500 text-2xl mb-4">Access Denied</h2>
-          <p>{error}</p>
+          <div className="animate-spin w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>Connecting to video room...</p>
+          <p className="text-xs text-gray-500 mt-2">Please wait</p>
         </div>
       </div>
     );
   }
 
-  if (loading || !userId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black text-white text-lg">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-          <span>Connecting to secure video channel...</span>
-        </div>
-      </div>
-    );
-  }
+  console.log("🎥 Connecting to LiveKit with URL:", livekitUrl);
 
   return (
-    <div className="min-h-screen bg-gray-950 p-4 font-sans antialiased">
-      <div className="max-w-7xl mx-auto flex justify-between items-center text-white mb-4 bg-gray-900/50 backdrop-blur px-6 py-4 rounded-2xl border border-gray-800">
-        <div>
-          <h2 className="text-lg font-bold text-gray-100">
-            Live Medical Consultation
-          </h2>
-          <p className="text-xs text-green-400 font-medium flex items-center gap-1 mt-0.5">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
-            Secure Encrypted Session
-          </p>
-        </div>
-        <button
-          onClick={() =>
-            navigate(isHostCaller ? "/doctor-dashboard" : "/patient-dashboard")
-          }
-          className="bg-red-600 hover:bg-red-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-lg"
-        >
-          End Session
-        </button>
-      </div>
-
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 h-[calc(100vh-130px)]">
-        {/* Remote View */}
-        <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl flex items-center justify-center">
-          {/* Keep video rendered in DOM but change visibility class */}
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className={`w-full h-full object-cover ${waiting ? "hidden" : "block"}`}
-          />
-
-          {waiting && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/90 text-center px-4 z-10">
-              <div>
-                <h3 className="text-xl font-bold mb-1 text-white">
-                  Waiting for Connection...
-                </h3>
-                <p className="text-gray-400 text-sm max-w-xs leading-relaxed">
-                  The session will begin automatically when the other
-                  participant arrives.
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="absolute top-4 left-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase z-20">
-            {isHostCaller ? "Patient Feed" : "Doctor Feed"}
-          </div>
-        </div>
-
-        {/* Local View */}
-        <div className="bg-gray-900 rounded-2xl overflow-hidden relative border border-gray-800 shadow-2xl">
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover transform scale-x-[-1]"
-          />
-          <div className="absolute bottom-4 right-4 bg-black/70 backdrop-blur text-xs text-gray-200 font-bold px-3 py-1.5 rounded-xl border border-white/10 uppercase">
-            You (Your Camera)
-          </div>
-        </div>
-      </div>
-    </div>
+    <LiveKitRoom
+      token={token}
+      serverUrl={livekitUrl}
+      connect={true}
+      video={true}
+      audio={true}
+      className="min-h-screen"
+    >
+      <VideoConference />
+      <RoomAudioRenderer />
+    </LiveKitRoom>
   );
 };
 

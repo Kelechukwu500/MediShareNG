@@ -5,7 +5,7 @@ import {
   persistentMultipleTabManager,
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getFunctions } from "firebase/functions";
+import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAfq6-39HiPKQdU35w-laqo0WcBSWdLzpg",
@@ -16,21 +16,34 @@ const firebaseConfig = {
   appId: "1:1011449021082:web:0da40df5ace874f109d523",
 };
 
-// Initialize Firebase Core Instance
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// 🔥 MODERN OFFLINE PERSISTENCE (Replaces the deprecated enableIndexedDbPersistence)
-// This enables secure offline snapshot tracking and keeps multi-tab queries in sync perfectly
+// Firestore with persistence
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({
     tabManager: persistentMultipleTabManager(),
   }),
 });
 
+// Auth
 export const auth = getAuth(app);
-export const functions = getFunctions(app);
 
-// Optional helper (recommended for your system consistency)
-export const getCurrentUserId = () => auth.currentUser?.uid;
+// Functions
+export const functions = getFunctions(app, "us-central1");
 
-export { app };
+// Emulator Connection (Only in Development)
+const isLocal =
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
+
+if (isLocal) {
+  try {
+    connectFunctionsEmulator(functions, "127.0.0.1", 5001);
+    console.log("🔥 Connected to Firebase Functions Emulator");
+  } catch (error) {
+    console.error("Failed to connect to Functions Emulator:", error);
+  }
+}
+
+export default app;
