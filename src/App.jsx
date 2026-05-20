@@ -20,6 +20,7 @@ import DigitalPharmacy from "./OtherPages/DigitalPharmacy";
 import CertifiedSpecialists from "./OtherPages/CertifiedSpecialists";
 import BecomeAPartner from "./OtherPages/BecomeAPartner";
 import ViewSpecialists from "./OtherPages/ViewSpecialists";
+import Providers from "./OtherPages/Providers";
 
 // FOOTER PAGES
 import OnlineConsultation from "./FooterPages/OnlineConsultation";
@@ -166,6 +167,7 @@ const App = () => {
               <Route path="/services" element={<Services />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/lab-pharma" element={<LabPharma />} />
+              <Route path="/providers" element={<Providers />} />
 
               {/* 🔒 LOCKED SECURE HEALTH SERVICE PIPELINES */}
               <Route

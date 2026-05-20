@@ -19,19 +19,29 @@ const EcosystemSection = () => {
 
             <p className="text-base sm:text-lg text-gray-600 leading-relaxed max-w-lg mx-auto lg:mx-0">
               At{" "}
-              <span className="text-[#2bb673] font-semibold">MediShareNG</span>
-              , we've brought every medical touchpoint together into one
-              powerful, cohesive platform — eliminating fragmented care for
-              truly seamless health delivery.
+              <span className="text-gray-600 font-semibold">MediShareNG</span>,
+              we've brought every medical touchpoint together into one powerful,
+              cohesive platform. Whether you are a patient seeking seamless
+              health delivery or a healthcare professional looking to expand
+              your reach, our ecosystem empowers providers to deliver quality
+              care efficiently while eliminating fragmented patient experiences.
             </p>
 
-            {/* CTA Button */}
-            <Link to="/services">
-              <button className="mt-6 px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-semibold text-lg flex items-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg mx-auto lg:mx-0">
-                Explore the Full Ecosystem
-                <span className="text-xl">→</span>
-              </button>
-            </Link>
+            {/* CTA Buttons */}
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+              <Link to="/services" className="w-full sm:w-auto">
+                <button className="w-full sm:w-auto px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-semibold text-lg flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg">
+                  Explore the Full Ecosystem
+                  <span className="text-xl">→</span>
+                </button>
+              </Link>
+
+              <Link to="/providers" className="w-full sm:w-auto">
+                <button className="w-full sm:w-auto px-8 py-4 border-2 border-emerald-600 hover:bg-emerald-50 text-emerald-700 rounded-2xl font-semibold text-lg flex items-center justify-center gap-3 transition-all duration-300 hover:scale-105 active:scale-95">
+                  Become a Provider
+                </button>
+              </Link>
+            </div>
           </div>
 
           {/* Right - Image */}

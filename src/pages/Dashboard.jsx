@@ -3,6 +3,7 @@ import { db } from "../firebase";
 import { collection, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import LabPharma from "./LabPharma"; // Adjust the relative path path based on your file structure
+import Providers from "../OtherPages/Providers";
 import { FlaskConical, Pill } from "lucide-react"; 
 
 
@@ -38,6 +39,8 @@ const Dashboard = () => {
   const audioRef = useRef(new Audio("/beep.mp3"));
   const isInitialLoad = useRef(true); // Track appointments load
   const isInitialNotificationLoad = useRef(true);
+  
+  
 
   // FIXED: Standardize state checks locally to bypass race conditions with custom tracking hooks
   const cachedRole = localStorage.getItem("userRole");
@@ -51,6 +54,11 @@ const Dashboard = () => {
   const [appointments, setAppointments] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [partnerRequests, setPartnerRequests] = useState([]);
+    const [selectedProvider, setSelectedProvider] = useState(null);
+
+  
+    
+
 
   const data = [
     { name: "Mon", users: 400 },
@@ -119,19 +127,17 @@ const Dashboard = () => {
       (err) => console.error("Users query tracking error:", err.message),
     );
 
-    // CLEAN SNAPSHOT WRAPPER FOR PRIVILEGED USERS ONLY
+    // REAL-TIME LISTENER FOR REGISTERED PROVIDER FORM ENTRIES
     const unsubProviders = onSnapshot(
-      collection(db, "users"),
+      collection(db, "providers"),
       (snap) => {
-        // Since providers are users with medical designations, filter them safely out of the users stream
-        // to resolve the unconfigured Firestore collection permission crash
-        const filteredProviders = snap.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() }))
-          .filter((u) => u.role === "doctor" || u.role === "admin-doctor");
-        setProviders(filteredProviders);
+        setProviders(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
       },
-      (err) => console.error("Providers query tracking error:", err.message),
+      (err) =>
+        console.error("Providers registration tracking error:", err.message),
     );
+  
+  
 
     // 1. RESTORED APPOINTMENTS LISTENER (PASTE THIS)
     const unsubAppointments = onSnapshot(
@@ -189,8 +195,6 @@ const Dashboard = () => {
         console.error("Notifications query tracking error:", err.message),
     );
 
-   
-
     const unsubPartners = onSnapshot(
       collection(db, "partnerRequests"),
       (snap) => {
@@ -207,9 +211,22 @@ const Dashboard = () => {
       unsubProviders();
       unsubAppointments();
       unsubNotifications();
-      unsubPartners();""
+      unsubPartners();
+      ("");
     };
   }, [isAdminAuthorized]);
+
+
+    const updateProviderStatus = async (id, newStatus) => {
+      try {
+        await updateDoc(doc(db, "providers", id), {
+          status: newStatus,
+        });
+        alert(`Facility status updated to: ${newStatus}`);
+      } catch (err) {
+        console.error("Failed to update status:", err);
+      }
+    };
 
 
   const approvePartner = async (id) => {
@@ -415,35 +432,123 @@ const Dashboard = () => {
             </div>
           )}
 
-          {/* PROVIDERS RENDER VIEW */}
+          {/* PROVIDERS TAB PANEL VIEW (SYNCS DIRECTLY TO REGISTERED FORM DATA) */}
           {activeTab === "providers" && (
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-              <h3 className="text-lg font-bold mb-4 text-gray-800">
-                Medical Providers
-              </h3>
+            <div className="bg-white p-6 rounded-3xl shadow-sm text-black border">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Healthcare Facilities Registration
+                  </h2>
+                  <p className="text-sm text-gray-500">
+                    Review comprehensive on-boarding applications submitted via
+                    the Provider form.
+                  </p>
+                </div>
+                <span className="px-4 py-2 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
+                  {providers.length} Total Applied
+                </span>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b text-gray-500 text-sm">
-                      <th className="pb-3 font-semibold">Medical Specialist</th>
-                      <th className="pb-3 font-semibold">Clinic Email</th>
-                      <th className="pb-3 font-semibold">Status Tag</th>
+                    <tr className="border-b bg-gray-50 text-gray-700 text-xs uppercase font-bold">
+                      <th className="p-4">Facility Details</th>
+                      <th className="p-4">Contact</th>
+                      <th className="p-4">Location (LGA/State)</th>
+                      <th className="p-4">Licensing Info</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4 text-center">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y text-gray-700 text-sm">
-                    {providers.map((p) => (
-                      <tr key={p.id} className="hover:bg-gray-50/50">
-                        <td className="py-3">{p.fullName}</td>
-                        <td className="py-3">{p.email}</td>
-                        <td className="py-3">
-                          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">
-                            {p.role === "admin-doctor"
-                              ? "Chief Executive Admin"
-                              : "Practitioner"}
-                          </span>
+
+                  <tbody className="divide-y text-sm">
+                    {providers.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan="6"
+                          className="text-center p-8 text-gray-400"
+                        >
+                          No provider facility submission records found in
+                          Firebase Firestore.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      providers.map((p) => (
+                        <tr key={p.id} className="hover:bg-gray-50">
+                          <td className="p-4">
+                            <p className="font-bold text-gray-900">
+                              {p.facilityName || "Unnamed Facility"}
+                            </p>
+                            <span className="text-xs px-2 py-0.5 bg-gray-100 rounded text-gray-600 font-medium">
+                              {p.facilityType}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <p className="text-gray-900 font-medium">
+                              {p.phoneNumbers}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {p.officialEmail}
+                            </p>
+                          </td>
+                          <td className="p-4">
+                            <p className="text-gray-900">{p.lga || "N/A"}</p>
+                            <p className="text-xs text-gray-500">
+                              {p.state || "N/A"}
+                            </p>
+                          </td>
+                          <td className="p-4">
+                            <p className="text-xs font-mono text-gray-700 bg-gray-100 px-2 py-1 rounded inline-block">
+                              Num: {p.licensingNumber || "None"}
+                            </p>
+                          </td>
+                          <td className="p-4">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                p.status === "approved"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : p.status === "rejected"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-amber-100 text-amber-800"
+                              }`}
+                            >
+                              {p.status || "pending"}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedProvider(p)}
+                                className="px-3 py-1 bg-blue-50 text-blue-600 hover:bg-blue-100 text-xs font-bold rounded-lg transition"
+                              >
+                                View All Details
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateProviderStatus(p.id, "approved")
+                                }
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  updateProviderStatus(p.id, "rejected")
+                                }
+                                className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-600 text-xs font-semibold rounded-lg transition"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -636,9 +741,328 @@ const Dashboard = () => {
           {/* PLACE THIS SINGLE COMPONENT BELOW YOUR APPOINTMENTS OR OVERVIEW TAB WINDOW */}
           <LabPharma activeTab={activeTab} dark={dark} />
         </main>
+
+        {/* FULL FIELD DETAIL SIDE DRAWER */}
+        {selectedProvider && (
+          <div className="fixed inset-0 z-50 flex justify-end bg-black/50 text-black backdrop-blur-sm">
+            <div className="w-full max-w-2xl bg-white h-screen overflow-y-auto p-6 md:p-8 shadow-2xl relative flex flex-col">
+              {/* Header */}
+              <div className="flex justify-between items-start border-b pb-4 mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    {selectedProvider.facilityName}
+                  </h3>
+                  <p className="text-sm text-emerald-600 font-medium">
+                    {selectedProvider.facilityType} —{" "}
+                    {selectedProvider.ownershipType}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProvider(null)}
+                  className="p-2 hover:bg-gray-100 rounded-full text-gray-500 hover:text-black transition"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Content Scrolling Body */}
+              <div className="flex-1 space-y-8 pr-1 overflow-y-auto">
+                {/* SECTION A & B */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+                    Facility Identity & Contact info
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl text-xs">
+                    <div>
+                      <span className="text-gray-500 block">
+                        Regulatory Body
+                      </span>
+                      <strong>
+                        {selectedProvider.regulatoryBody || "N/A"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">
+                        Year Established
+                      </span>
+                      <strong>
+                        {selectedProvider.yearEstablished || "N/A"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">
+                        Licensing Number
+                      </span>
+                      <strong>
+                        {selectedProvider.licensingNumber || "N/A"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Landmark</span>
+                      <strong>{selectedProvider.landmark || "N/A"}</strong>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500 block">
+                        Physical Address
+                      </span>
+                      <strong>
+                        {selectedProvider.physicalAddress || "N/A"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">State / LGA</span>
+                      <strong>
+                        {selectedProvider.state} / {selectedProvider.lga}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Website Links</span>
+                      <a
+                        href={selectedProvider.websiteSocial}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-emerald-600 underline"
+                      >
+                        {selectedProvider.websiteSocial || "None"}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION F: STAFF COUNTS */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+                    SECTION F: Resource Capacity
+                  </h4>
+                  <div className="grid grid-cols-5 gap-2 text-center">
+                    <div className="p-3 bg-blue-50 rounded-xl">
+                      <p className="text-xl font-bold text-blue-700">
+                        {selectedProvider.numDoctors || 0}
+                      </p>
+                      <p className="text-[10px] text-gray-500 uppercase">
+                        Doctors
+                      </p>
+                    </div>
+                    <div className="p-3 bg-purple-50 rounded-xl">
+                      <p className="text-xl font-bold text-purple-700">
+                        {selectedProvider.numNurses || 0}
+                      </p>
+                      <p className="text-[10px] text-gray-500 uppercase">
+                        Nurses
+                      </p>
+                    </div>
+                    <div className="p-3 bg-amber-50 rounded-xl">
+                      <p className="text-xl font-bold text-amber-700">
+                        {selectedProvider.numBeds || 0}
+                      </p>
+                      <p className="text-[10px] text-gray-500 uppercase">
+                        Beds
+                      </p>
+                    </div>
+                    <div className="p-3 bg-teal-50 rounded-xl">
+                      <p className="text-xl font-bold text-teal-700">
+                        {selectedProvider.numLabStaff || 0}
+                      </p>
+                      <p className="text-[10px] text-gray-500 uppercase">
+                        Lab Staff
+                      </p>
+                    </div>
+                    <div className="p-3 bg-gray-100 rounded-xl">
+                      <p className="text-xl font-bold text-gray-700">
+                        {selectedProvider.numOtherStaff || 0}
+                      </p>
+                      <p className="text-[10px] text-gray-500 uppercase">
+                        Others
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION D & E: AVAILABILITY & PAYMENTS */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                      Operation Windows
+                    </h4>
+                    <p className="text-xs text-gray-600">
+                      Hours:{" "}
+                      <strong className="text-black">
+                        {selectedProvider.operatingHours || "N/A"}
+                      </strong>
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {selectedProvider.operationDays?.map((day) => (
+                        <span
+                          key={day}
+                          className="text-[10px] px-2 py-0.5 bg-emerald-50 text-emerald-700 font-medium rounded"
+                        >
+                          {day}
+                        </span>
+                      )) || (
+                        <span className="text-xs text-gray-400">
+                          None checked
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                      Payment & HMO Methods
+                    </h4>
+                    <p className="text-xs text-gray-600">
+                      HMO Network:{" "}
+                      <strong className="text-black">
+                        {selectedProvider.acceptedHmos || "None"}
+                      </strong>
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {selectedProvider.paymentMethods?.map((method) => (
+                        <span
+                          key={method}
+                          className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-700 font-medium rounded"
+                        >
+                          {method}
+                        </span>
+                      )) || (
+                        <span className="text-xs text-gray-400">
+                          None checked
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* FIXED SERVICES CHECKLISTS MATCHING PROVIDER FIELD NAMES */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3">
+                    SECTION C: Services Checklists
+                  </h4>
+                  <div className="space-y-3 max-h-48 overflow-y-auto border p-3 rounded-2xl bg-gray-50 text-xs">
+                    {selectedProvider.clinicalGeneral?.length > 0 && (
+                      <div>
+                        <p className="font-bold text-emerald-800 mb-1">
+                          General Clinical
+                        </p>
+                        <p>{selectedProvider.clinicalGeneral.join(", ")}</p>
+                      </div>
+                    )}
+                    {selectedProvider.clinicalSpecialist?.length > 0 && (
+                      <div className="border-t pt-2">
+                        <p className="font-bold text-emerald-800 mb-1">
+                          Specialist Services
+                        </p>
+                        <p>{selectedProvider.clinicalSpecialist.join(", ")}</p>
+                      </div>
+                    )}
+                    {selectedProvider.diagnosticLab?.length > 0 && (
+                      <div className="border-t pt-2">
+                        <p className="font-bold text-emerald-800 mb-1">
+                          Laboratory
+                        </p>
+                        <p>{selectedProvider.diagnosticLab.join(", ")}</p>
+                      </div>
+                    )}
+                    {selectedProvider.diagnosticImaging?.length > 0 && (
+                      <div className="border-t pt-2">
+                        <p className="font-bold text-emerald-800 mb-1">
+                          Imaging
+                        </p>
+                        <p>{selectedProvider.diagnosticImaging.join(", ")}</p>
+                      </div>
+                    )}
+                    {selectedProvider.alliedSupport?.length > 0 && (
+                      <div className="border-t pt-2">
+                        <p className="font-bold text-emerald-800 mb-1">
+                          Allied & Support
+                        </p>
+                        <p>{selectedProvider.alliedSupport.join(", ")}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* SECTION K: HIGH-END SPECIALIZED SERVICES */}
+                {selectedProvider.specializedServices?.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                      SECTION K: Advanced Sub-Specialties
+                    </h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedProvider.specializedServices.map((srv) => (
+                        <span
+                          key={srv}
+                          className="text-xs px-2.5 py-1 bg-purple-100 text-purple-800 font-semibold rounded-lg"
+                        >
+                          {srv}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* DECLARATION DATA */}
+                <div className="border-t pt-4 bg-gray-50 p-4 rounded-2xl">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                    Legal Declaration Details
+                  </h4>
+                  <p className="text-xs text-gray-500 italic mb-2">
+                    "I hereby confirm that the information provided is accurate
+                    and up to date."
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-gray-400 block">Full Name</span>
+                      <strong>
+                        {selectedProvider.declarationName || "N/A"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block">Designation</span>
+                      <strong>
+                        {selectedProvider.declarationDesignation || "N/A"}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block">Signed Date</span>
+                      <strong>
+                        {selectedProvider.declarationDate || "N/A"}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick action footer bar */}
+              <div className="border-t pt-4 mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateProviderStatus(selectedProvider.id, "rejected");
+                    setSelectedProvider(null);
+                  }}
+                  className="px-5 py-2.5 bg-red-50 text-red-600 font-bold rounded-xl text-sm hover:bg-red-100 transition"
+                >
+                  Reject Application
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateProviderStatus(selectedProvider.id, "approved");
+                    setSelectedProvider(null);
+                  }}
+                  className="px-5 py-2.5 bg-emerald-600 text-white font-bold rounded-xl text-sm hover:bg-emerald-700 transition"
+                >
+                  Approve and Verify Facility ✓
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
 export default Dashboard;
+

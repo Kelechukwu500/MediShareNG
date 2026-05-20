@@ -112,19 +112,19 @@ const breatheAnimation = {
 const testimonials = [
   {
     name: "Chinedu Okafor",
-    text: "MedConnectNG helped me book a doctor instantly without stress. The experience was smooth and professional.",
+    text: "MediShareNG helped me book a doctor instantly without stress. The experience was smooth and professional.",
   },
   {
     name: "Aisha Bello",
-    text: "I never imagined healthcare could be this easy. MedConnectNG made accessing medical care fast and reliable.",
+    text: "I never imagined healthcare could be this easy. MediShareNG made accessing medical care fast and reliable.",
   },
   {
     name: "Adeola Johnson",
-    text: "From online consultations to pharmacy access, MedConnectNG has completely changed how I manage my health.",
+    text: "From online consultations to pharmacy access, MediShareNG has completely changed how I manage my health.",
   },
   {
     name: "Ifeoma Eze",
-    text: "The platform is modern, simple, and very responsive. I recommend MedConnectNG to everyone.",
+    text: "The platform is modern, simple, and very responsive. I recommend MediShareNG to everyone.",
   },
   {
     name: "Musa Abdullahi",
@@ -132,23 +132,23 @@ const testimonials = [
   },
   {
     name: "Temitope Adebayo",
-    text: "MedConnectNG gives a truly next-generation healthcare experience. Everything works seamlessly.",
+    text: "MediShareNG gives a truly next-generation healthcare experience. Everything works seamlessly.",
   },
   {
     name: "Ucheoma Nwosu", 
-    text: "MedConnectNG has revolutionized the way I access healthcare. It's efficient, user-friendly, and reliable.",
+    text: "MediShareNG has revolutionized the way I access healthcare. It's efficient, user-friendly, and reliable.",
   },
   {
     name: "Emeka Chukwuemeka",
-    text: "MedConnectNG has transformed my healthcare experience. It's innovative and easy to use.",
+    text: "MediShareNG has transformed my healthcare experience. It's innovative and easy to use.",
   },
   {
     name: "Fatima Yusuf",
-    text: "MedConnectNG is a game-changer in healthcare. The platform is intuitive and the service is excellent.",
+    text: "MediShareNG is a game-changer in healthcare. The platform is intuitive and the service is excellent.",
   },
   {
     name: "Queeneth Osifo",
-    text: "MedConnectNG has made healthcare accessible and convenient. I can't imagine going back to the old way.",
+    text: "MediShareNG has made healthcare accessible and convenient. I can't imagine going back to the old way.",
   },
 ];
 
