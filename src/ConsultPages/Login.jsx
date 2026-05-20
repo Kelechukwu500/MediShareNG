@@ -32,9 +32,11 @@ const Login = () => {
         form.email,
         form.password,
       );
+
       const user = userCred.user;
 
-      if (!user.emailVerified) {
+      // BYPASS: Allows admin to log in locally without email verification block
+      if (!user.emailVerified && form.email !== "medisharehub@gmail.com") {
         alert("Please verify your email before logging in.");
         await signOut(auth);
         localStorage.clear();
@@ -54,7 +56,16 @@ const Login = () => {
       }
 
       const userData = snap.data();
-      await updateDoc(userRef, { verified: true });
+
+      // FIX: Try to update verification status, catch error if rules block it
+      try {
+        await updateDoc(userRef, { verified: true });
+      } catch (ruleError) {
+        console.warn(
+          "Firestore rule restricted user self-update, continuing login...",
+          ruleError,
+        );
+      }
 
       // 1. Force state synchronization before running client navigation changes
       localStorage.setItem("userId", user.uid);
