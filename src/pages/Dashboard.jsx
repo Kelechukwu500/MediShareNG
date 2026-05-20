@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db } from "../firebase";
 import { collection, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +32,9 @@ const Dashboard = () => {
   const [dark, setDark] = useState(false);
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const audioRef = useRef(new Audio("/beep.mp3"));
+  const isInitialLoad = useRef(true); // Track appointments load
+  const isInitialNotificationLoad = useRef(true);
 
   // FIXED: Standardize state checks locally to bypass race conditions with custom tracking hooks
   const cachedRole = localStorage.getItem("userRole");
@@ -125,19 +128,54 @@ const Dashboard = () => {
       (err) => console.error("Providers query tracking error:", err.message),
     );
 
+    // 1. RESTORED APPOINTMENTS LISTENER (PASTE THIS)
     const unsubAppointments = onSnapshot(
       collection(db, "appointments"),
       (snap) => {
-        setAppointments(
-          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-        );
+        const appointmentList = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+
+        if (!isInitialLoad.current) {
+          snap.docChanges().forEach((change) => {
+            if (change.type === "added") {
+              audioRef.current.play().catch((err) => {
+                console.log(
+                  "Audio playback held until user interacts with UI:",
+                  err.message,
+                );
+              });
+            }
+          });
+        } else {
+          isInitialLoad.current = false;
+        }
+
+        setAppointments(appointmentList);
       },
       (err) => console.error("Appointments query tracking error:", err.message),
     );
 
+    // 2. CLEAN SINGLE NOTIFICATIONS LISTENER (PASTE THIS)
     const unsubNotifications = onSnapshot(
       collection(db, "notifications"),
       (snap) => {
+        if (!isInitialNotificationLoad.current) {
+          snap.docChanges().forEach((change) => {
+            if (change.type === "added") {
+              audioRef.current.play().catch((err) => {
+                console.log(
+                  "Audio playback held until user interacts with UI:",
+                  err.message,
+                );
+              });
+            }
+          });
+        } else {
+          isInitialNotificationLoad.current = false;
+        }
+
         setNotifications(
           snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
         );
@@ -145,6 +183,8 @@ const Dashboard = () => {
       (err) =>
         console.error("Notifications query tracking error:", err.message),
     );
+
+   
 
     const unsubPartners = onSnapshot(
       collection(db, "partnerRequests"),
@@ -162,9 +202,10 @@ const Dashboard = () => {
       unsubProviders();
       unsubAppointments();
       unsubNotifications();
-      unsubPartners();
+      unsubPartners();""
     };
   }, [isAdminAuthorized]);
+
 
   const approvePartner = async (id) => {
     try {
