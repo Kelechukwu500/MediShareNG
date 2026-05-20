@@ -10,6 +10,7 @@ import History from "./pages/History";
 import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
 import Contact from "./pages/Contact";
+import LabPharma from "./pages/LabPharma";
 
 // OTHER PAGES
 import AISymptomsChecker from "./OtherPages/AISymptomsChecker";
@@ -164,6 +165,7 @@ const App = () => {
               <Route path="/history" element={<History />} />
               <Route path="/services" element={<Services />} />
               <Route path="/contact" element={<Contact />} />
+              <Route path="/lab-pharma" element={<LabPharma />} />
 
               {/* 🔒 LOCKED SECURE HEALTH SERVICE PIPELINES */}
               <Route

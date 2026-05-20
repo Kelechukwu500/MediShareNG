@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { db } from "../firebase";
 import { collection, onSnapshot, updateDoc, doc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import LabPharma from "./LabPharma"; // Adjust the relative path path based on your file structure
+import { FlaskConical, Pill } from "lucide-react"; 
+
 
 import {
   LayoutDashboard,
@@ -80,6 +83,8 @@ const Dashboard = () => {
     { key: "users", label: "Users", icon: Users },
     { key: "providers", label: "Providers", icon: Hospital },
     { key: "appointments", label: "Appointments", icon: Calendar },
+    { key: "eLab", label: "E-Lab ", icon: FlaskConical },
+    { key: "ePharmacy", label: "E-Pharmacy ", icon: Pill },
     { key: "analytics", label: "Analytics", icon: BarChart3 },
     { key: "notifications", label: "Notifications", icon: Bell },
     { key: "partners", label: "Partner Requests", icon: Handshake },
@@ -628,6 +633,8 @@ const Dashboard = () => {
               )}
             </div>
           )}
+          {/* PLACE THIS SINGLE COMPONENT BELOW YOUR APPOINTMENTS OR OVERVIEW TAB WINDOW */}
+          <LabPharma activeTab={activeTab} dark={dark} />
         </main>
       </div>
     </div>
