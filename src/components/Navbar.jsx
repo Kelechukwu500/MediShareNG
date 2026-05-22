@@ -133,7 +133,7 @@ const Navbar = ({ user }) => {
                   to="/signup"
                   className="rounded-md bg-gray-100 px-4 py-2 text-sm text-teal-600 hover:bg-gray-200"
                 >
-                  Sign Up
+                  Register
                 </Link>
               </div>
             )}
@@ -230,7 +230,7 @@ const Navbar = ({ user }) => {
                     onClick={() => setOpen(false)}
                     className="bg-gray-100 px-3 py-2 rounded-md"
                   >
-                    Sign Up
+                    Register
                   </Link>
                 </div>
               )}

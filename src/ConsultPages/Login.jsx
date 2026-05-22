@@ -150,6 +150,16 @@ const Login = () => {
               {loading ? "Verifying..." : "Login"}{" "}
               {!loading && <ArrowRight size={20} />}
             </button>
+
+            <p className="mt-6 text-center text-sm text-gray-600 font-medium">
+              Don't have an account?{" "}
+              <span
+                onClick={() => navigate("/signup")}
+                className="text-[#2bb673] font-bold hover:underline cursor-pointer"
+              >
+                Register
+              </span>
+            </p>
           </form>
         </div>
       </div>
