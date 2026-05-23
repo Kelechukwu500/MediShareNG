@@ -456,7 +456,7 @@ const Dashboard = () => {
                     <tr className="border-b bg-gray-50 text-gray-700 text-xs uppercase font-bold">
                       <th className="p-4">Facility Details</th>
                       <th className="p-4">Contact</th>
-                      <th className="p-4">Location (LGA/State)</th>
+                      <th className="p-4">Location (City/State)</th>
                       <th className="p-4">Licensing Info</th>
                       <th className="p-4">Status</th>
                       <th className="p-4 text-center">Actions</th>
