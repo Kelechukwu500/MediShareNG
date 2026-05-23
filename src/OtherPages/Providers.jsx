@@ -16,7 +16,7 @@ const Provider = () => {
 
     physicalAddress: "",
     state: "",
-    lga: "",
+    city: "",
     landmark: "",
     phoneNumbers: "",
     officialEmail: "",
@@ -345,7 +345,7 @@ const Provider = () => {
                 </div>
 
                 <div>
-                  <label className={labelClass}>LGA</label>
+                  <label className={labelClass}>City</label>
 
                   <input
                     type="text"

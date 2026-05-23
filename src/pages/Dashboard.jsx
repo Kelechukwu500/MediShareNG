@@ -738,7 +738,9 @@ const Dashboard = () => {
               )}
             </div>
           )}
-          {/* PLACE THIS SINGLE COMPONENT BELOW YOUR APPOINTMENTS OR OVERVIEW TAB WINDOW */}
+
+
+          {/* APPOINTMENTS OR OVERVIEW TAB WINDOW */}
           <LabPharma activeTab={activeTab} dark={dark} />
         </main>
 
@@ -811,7 +813,7 @@ const Dashboard = () => {
                       </strong>
                     </div>
                     <div>
-                      <span className="text-gray-500 block">State / LGA</span>
+                      <span className="text-gray-500 block">State / City</span>
                       <strong>
                         {selectedProvider.state} / {selectedProvider.lga}
                       </strong>
