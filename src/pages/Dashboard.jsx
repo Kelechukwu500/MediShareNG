@@ -284,7 +284,7 @@ const Dashboard = () => {
             {open ? <X /> : <Menu />}
           </button>
           <h1 className="text-base md:text-xl font-bold text-emerald-600">
-            MediShareNG Dashboard
+            Admin-Doctor Dashboard
           </h1>
         </div>
 
