@@ -7,11 +7,12 @@ import {
 import { auth, db } from "../firebase";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { ShieldCheck, MailCheck, UserPlus, ArrowRight } from "lucide-react";
+import { ShieldCheck, MailCheck, UserPlus, ArrowRight, Eye, EyeOff } from "lucide-react";
 
 const Signup = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({
     fullName: "",
     email: "",
@@ -201,15 +202,24 @@ const Signup = () => {
                 Password
               </label>
 
-              <input
-                name="password"
-                type="password"
-                value={form.password}
-                onChange={handleChange}
-                placeholder="Enter password"
-                required
-                className="mt-2 w-full h-14 px-4 rounded-2xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#2bb673]"
-              />
+              <div className="relative mt-2">
+                <input
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={handleChange}
+                  placeholder="Enter password"
+                  required
+                  className="w-full h-14 pl-4 pr-12 rounded-2xl border border-gray-200 outline-none focus:ring-2 focus:ring-[#2bb673]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
 
             {/* BUTTON */}

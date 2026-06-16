@@ -11,11 +11,14 @@ import {
   LogIn,
   ArrowRight,
   LockKeyhole,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 const Login = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
 
   const handleChange = (e) => {
@@ -34,15 +37,6 @@ const Login = () => {
       );
 
       const user = userCred.user;
-
-      // BYPASS: Allows admin to log in locally without email verification block
-      if (!user.emailVerified && form.email !== "medisharehub@gmail.com") {
-        alert("Please verify your email before logging in.");
-        await signOut(auth);
-        localStorage.clear();
-        setLoading(false);
-        return;
-      }
 
       const userRef = doc(db, "users", user.uid);
       const snap = await getDoc(userRef);
@@ -133,15 +127,26 @@ const Login = () => {
               required
               className="mt-8 w-full h-14 px-4 rounded-2xl border outline-none focus:ring-2 focus:ring-[#2bb673]"
             />
-            <input
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={handleChange}
-              placeholder="Password"
-              required
-              className="mt-5 w-full h-14 px-4 rounded-2xl border outline-none focus:ring-2 focus:ring-[#2bb673]"
-            />
+
+            <div className="relative mt-5">
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={handleChange}
+                placeholder="Password"
+                required
+                className="w-full h-14 pl-4 pr-12 rounded-2xl border outline-none focus:ring-2 focus:ring-[#2bb673]"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none"
+              >
+                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+
             <button
               type="submit"
               disabled={loading}
