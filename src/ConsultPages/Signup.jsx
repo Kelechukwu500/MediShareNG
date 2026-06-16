@@ -1,8 +1,7 @@
 import { useState } from "react";
 import {
   createUserWithEmailAndPassword,
-  sendEmailVerification,
-  signOut, // 🔥 IMPORTED: For closing background auth sessions immediately
+  signOut, // 🔥 KEEPING: For closing background auth sessions immediately
 } from "firebase/auth";
 
 import { auth, db } from "../firebase";
@@ -49,12 +48,7 @@ const Signup = () => {
 
       const user = userCred.user;
 
-      // 2. SEND EMAIL VERIFICATION
-      await sendEmailVerification(user, {
-        url: `${window.location.origin}/login`,
-      });
-
-      // 3. SAVE USER PROFILE IN FIRESTORE
+      // 2. SAVE USER PROFILE IN FIRESTORE
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         fullName: form.fullName,
@@ -63,9 +57,9 @@ const Signup = () => {
         // ROLE SYSTEM READY
         role: "patient", // default role
 
-        // AUTH STATUS
-        verified: false,
-        emailVerified: false,
+        // AUTH STATUS (Updated to true since verification is removed)
+        verified: true,
+        emailVerified: true,
 
         // FUTURE SCALING FIELDS
         status: "active",
@@ -74,10 +68,10 @@ const Signup = () => {
       });
 
       alert(
-        "Account created successfully. Please verify your email before login.",
+        "You have successfully registered your credentials, you can now login. Welcome to MediShareNG!",
       );
 
-      // 4. 🔥 TERMINATE UNVERIFIED BACKGROUND HANDSHAKE SESSION IMMEDIATELY
+      // 3.
       await signOut(auth);
       localStorage.clear();
 
@@ -126,16 +120,15 @@ const Signup = () => {
             </h1>
 
             <p className="mt-6 text-lg text-white/90 leading-relaxed">
-              Create your healthcare account, verify your email securely,
-              connect with doctors, and begin online consultations from
-              anywhere.
+              Create your healthcare account, connect with doctors, and begin
+              online consultations from anywhere.
             </p>
 
             {/* FEATURES */}
             <div className="mt-10 space-y-5">
               <div className="flex items-center gap-4">
-                <MailCheck size={22} />
-                <span>Email Verification Security</span>
+                <ShieldCheck size={22} />
+                <span>Instant Account Setup</span>
               </div>
 
               <div className="flex items-center gap-4">
@@ -240,24 +233,6 @@ const Signup = () => {
                 Login here
               </span>
             </p>
-
-            {/* EMAIL VERIFICATION NOTICE */}
-            <div className="mt-8 bg-[#ecfdf5] border border-[#a7f3d0] rounded-2xl p-5">
-              <div className="flex items-start gap-3">
-                <MailCheck size={22} className="text-[#065f46] mt-1" />
-
-                <div>
-                  <h3 className="font-bold text-[#065f46]">
-                    Verification Notice
-                  </h3>
-                  <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                    A confirmation link will be sent to your email immediately.
-                    Please follow the instructions to unlock your account
-                    features.
-                  </p>
-                </div>
-              </div>
-            </div>
           </form>
         </div>
       </div>
